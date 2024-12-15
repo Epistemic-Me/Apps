@@ -1,0 +1,3 @@
+[submodule "PerspectiveTaker/Philosophies"]
+	path = PerspectiveTaker/Philosophies
+	url = git@github.com:Epistemic-Me/Philosophies.git
