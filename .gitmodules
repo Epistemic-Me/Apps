@@ -4,3 +4,6 @@
 [submodule "Go-SDK"]
 	path = Go-SDK
 	url = git@github.com:Epistemic-Me/Go-SDK.git
+[submodule "PerspectiveTaker/Go-SDK"]
+	path = PerspectiveTaker/Go-SDK
+	url = git@github.com:Epistemic-Me/Go-SDK.git
