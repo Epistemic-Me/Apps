@@ -1,0 +1,3 @@
+[submodule "Proto"]
+	path = Proto
+	url = git@github.com:Epistemic-Me/Proto.git
