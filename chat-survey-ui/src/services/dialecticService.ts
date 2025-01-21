@@ -152,13 +152,13 @@ export class DialecticService {
     });
   }
 
-  async preprocessQA(questionBlob: string, answerBlob: string, retries = 3) {
+  async preprocessQuestionAnswer(questionBlob: string, answerBlob: string, retries = 3) {
     await this.clientInitialization;
     let lastError: unknown;
     
     for (let i = 0; i < retries; i++) {
       try {
-        return await this.client.preprocessQA(questionBlob, answerBlob);
+        return await this.client.preprocessQuestionAnswer(questionBlob, answerBlob);
       } catch (error) {
         console.warn(`Attempt ${i + 1} failed:`, error);
         lastError = error;

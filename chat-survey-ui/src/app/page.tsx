@@ -79,7 +79,7 @@ export default function ChatPage() {
               answer: nextMsg.content.slice(0, 50) 
             });
             
-            const response = await service.preprocessQA(
+            const response = await service.preprocessQuestionAnswer(
               currentMsg.content,
               nextMsg.content
             );
