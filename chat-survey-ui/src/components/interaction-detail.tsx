@@ -1,17 +1,20 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { DialecticInteraction } from "@/types/chat"
+import { DialecticalInteraction } from "@/types/chat"
 
 interface InteractionDetailProps {
-  interaction: DialecticInteraction | null
+  interaction: DialecticalInteraction | null
   onClose: () => void
 }
 
 export function InteractionDetail({ interaction, onClose }: InteractionDetailProps) {
+  console.log('Detail interaction:', {
+    id: interaction?.id,
+    question: interaction?.interaction?.type?.value?.question?.question,
+    answer: interaction?.interaction?.type?.value?.answer?.userAnswer,
+    beliefs: interaction?.interaction?.type?.value?.extractedBeliefs
+  });
   if (!interaction) return null
-
-  console.log('Interaction in detail:', interaction);
-  console.log('Beliefs to render:', interaction.beliefs);
 
   return (
     <Dialog open={!!interaction} onOpenChange={onClose}>
@@ -23,18 +26,22 @@ export function InteractionDetail({ interaction, onClose }: InteractionDetailPro
           <div className="space-y-6">
             <div>
               <h3 className="font-semibold mb-2">Question</h3>
-              <p className="text-sm text-muted-foreground">{interaction.question}</p>
+              <p className="text-sm text-muted-foreground">
+                {interaction.interaction.type?.value?.question?.question}
+              </p>
             </div>
             <div>
               <h3 className="font-semibold mb-2">Answer</h3>
-              <p className="text-sm text-muted-foreground">{interaction.answer}</p>
+              <p className="text-sm text-muted-foreground">
+                {interaction.interaction.type?.value?.answer?.userAnswer}
+              </p>
             </div>
             <div>
-              <h3 className="font-semibold mb-2">Beliefs</h3>
+              <h3 className="font-semibold mb-2">Extracted Beliefs</h3>
               <ul className="list-disc list-inside space-y-2">
-                {interaction.beliefs.map((belief) => (
+                {interaction.interaction.type?.value?.extractedBeliefs?.map((belief) => (
                   <li key={belief.id} className="text-sm text-muted-foreground">
-                    {belief.content}
+                    {belief.content?.[0]?.rawStr}
                   </li>
                 ))}
               </ul>

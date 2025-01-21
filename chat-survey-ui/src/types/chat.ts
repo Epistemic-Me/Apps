@@ -10,11 +10,14 @@ export interface Belief {
   content: string
 }
 
-export interface DialecticInteraction {
-  id: string
+export interface QuestionAnswer {
   question: string
   answer: string
-  beliefs: Belief[]
-  timestamp: Date
+  extractedBeliefs: Belief[]
+}
+
+export interface DialecticalInteraction {
+  id: string;
+  interaction: InteractionData;
 }
 
