@@ -2,13 +2,6 @@ import { EpistemicMeClient, DialecticType, UserAnswer, InteractionData } from "@
 import { AuthService } from "./authService";
 import { DialecticalInteraction, InteractionValue } from '../types/chat';
 
-function replacer(key: string, value: any) {
-  if (typeof value === 'bigint') {
-    return value.toString();
-  }
-  return value;
-}
-
 function mapInteractionValue(interaction: InteractionData): InteractionValue | null {
   console.log('Mapping interaction:', {
     case: interaction?.type?.case,
