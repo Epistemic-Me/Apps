@@ -1,20 +1,21 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { DialecticalInteraction } from "@/types/chat"
+import { DialecticalInteraction, QuestionAnswerValue } from "@/types/chat"
 
 interface InteractionDetailProps {
   interaction: DialecticalInteraction | null
   onClose: () => void
 }
 
+function isQuestionAnswer(value: any): value is QuestionAnswerValue {
+  return value?.type === 'questionAnswer';
+}
+
 export function InteractionDetail({ interaction, onClose }: InteractionDetailProps) {
-  console.log('Detail interaction:', {
-    id: interaction?.id,
-    question: interaction?.interaction?.type?.value?.question?.question,
-    answer: interaction?.interaction?.type?.value?.answer?.userAnswer,
-    beliefs: interaction?.interaction?.type?.value?.extractedBeliefs
-  });
-  if (!interaction) return null
+  if (!interaction) return null;
+
+  const value = interaction.interaction.type?.value;
+  if (!isQuestionAnswer(value)) return null;
 
   return (
     <Dialog open={!!interaction} onOpenChange={onClose}>
@@ -27,21 +28,23 @@ export function InteractionDetail({ interaction, onClose }: InteractionDetailPro
             <div>
               <h3 className="font-semibold mb-2">Question</h3>
               <p className="text-sm text-muted-foreground">
-                {interaction.interaction.type?.value?.question?.question}
+                {value.question}
               </p>
             </div>
             <div>
               <h3 className="font-semibold mb-2">Answer</h3>
               <p className="text-sm text-muted-foreground">
-                {interaction.interaction.type?.value?.answer?.userAnswer}
+                {value.answer}
               </p>
             </div>
             <div>
               <h3 className="font-semibold mb-2">Extracted Beliefs</h3>
               <ul className="list-disc list-inside space-y-2">
-                {interaction.interaction.type?.value?.extractedBeliefs?.map((belief) => (
+                {value.extractedBeliefs?.map((belief) => (
                   <li key={belief.id} className="text-sm text-muted-foreground">
-                    {belief.content?.[0]?.rawStr}
+                    {Array.isArray(belief.content) 
+                      ? belief.content[0]?.rawStr 
+                      : belief.content}
                   </li>
                 ))}
               </ul>
