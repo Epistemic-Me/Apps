@@ -1,17 +1,81 @@
 import { EpistemicMeClient, DialecticType, UserAnswer, InteractionData } from "@epistemicme/sdk";
 import { AuthService } from "./authService";
+import { DialecticalInteraction, InteractionValue } from '../types/chat';
 
-// Return type should match the actual structure we see in logs
-type DialecticalInteraction = {
-  id: string;
-  interaction: InteractionData;
-};
+function mapInteractionValue(interaction: InteractionData): InteractionValue | null {
+  console.log('Mapping interaction:', {
+    case: interaction?.type?.case,
+    value: interaction?.type?.value
+  });
 
-function replacer(key: string, value: any) {
-  if (typeof value === 'bigint') {
-    return value.toString();
+  const value = interaction?.type?.value;
+  if (!value) {
+    console.log('No value found in interaction');
+    return null;
   }
-  return value;
+
+  const baseValue = {
+    updatedAtMillisUtc: value.updatedAtMillisUtc?.toString() || "0"
+  };
+
+  switch (interaction.type.case) {
+    case 'questionAnswer': {
+      console.log('Processing questionAnswer:', {
+        question: value.question,
+        answer: value.answer,
+        extractedBeliefs: value.extractedBeliefs
+      });
+
+      return {
+        ...baseValue,
+        type: 'questionAnswer' as const,
+        question: value.question?.question || '',
+        answer: value.answer?.userAnswer || '',
+        extractedBeliefs: (value.extractedBeliefs || []).map(b => ({
+          id: b.id || '',
+          content: b.content || ''
+        }))
+      };
+    }
+    case 'hypothesisEvidence': {
+      const he = value as {
+        hypothesis?: string,
+        evidence?: string,
+        isCounterfactual?: boolean,
+        updatedBeliefs?: Array<{ id: string, content: Array<{ rawStr: string }> }>
+      };
+      return {
+        ...baseValue,
+        type: 'hypothesisEvidence',
+        hypothesis: he.hypothesis || '',
+        evidence: he.evidence || '',
+        isCounterfactual: he.isCounterfactual || false,
+        updatedBeliefs: he.updatedBeliefs?.map(b => ({
+          id: b.id,
+          content: b.content?.[0]?.rawStr || ''
+        }))
+      };
+    }
+    case 'actionOutcome': {
+      const ao = value as {
+        action?: string,
+        outcome?: string,
+        updatedBeliefs?: Array<{ id: string, content: Array<{ rawStr: string }> }>
+      };
+      return {
+        ...baseValue,
+        type: 'actionOutcome',
+        action: ao.action || '',
+        outcome: ao.outcome || '',
+        updatedBeliefs: ao.updatedBeliefs?.map(b => ({
+          id: b.id,
+          content: b.content?.[0]?.rawStr || ''
+        }))
+      };
+    }
+    default:
+      return null;
+  }
 }
 
 export class DialecticService {
@@ -56,12 +120,6 @@ export class DialecticService {
   ): Promise<{ dialectic?: { userInteractions?: DialecticalInteraction[] } }> {
     await this.clientInitialization;
     
-    console.log('Sending update request:', {
-      dialecticId,
-      question,
-      answer
-    });
-
     const response = await this.client.updateDialectic({
       dialecticId,
       userId: this.selfModelId,
@@ -72,76 +130,41 @@ export class DialecticService {
       customQuestion: question
     });
 
-    console.log('Full interaction structure:', JSON.stringify({
-      interaction: response.dialectic?.userInteractions?.[0]?.interaction,
-    }, replacer, 2));
-
-    console.log('Raw response from server:', {
-      dialecticId: response.dialectic?.id,
-      interactionCount: response.dialectic?.userInteractions?.length,
-      firstInteraction: {
-        id: response.dialectic?.userInteractions?.[0]?.id,
-        interaction: JSON.stringify(response.dialectic?.userInteractions?.[0]?.interaction, replacer)
-      }
-    });
-
-    console.log('First interaction:', {
-      id: response.dialectic?.userInteractions?.[0]?.id,
-      interaction: response.dialectic?.userInteractions?.[0]?.interaction,
-      type: response.dialectic?.userInteractions?.[0]?.interaction?.type,
-      case: response.dialectic?.userInteractions?.[0]?.interaction?.type?.case,
-      value: response.dialectic?.userInteractions?.[0]?.interaction?.type?.value,
-    });
-
-    console.log('Interaction type:', {
-      type: typeof response.dialectic?.userInteractions?.[0]?.interaction,
-      properties: Object.keys(response.dialectic?.userInteractions?.[0]?.interaction || {})
-    });
-
-    console.log('Raw interaction before mapping:', {
-      id: response.dialectic?.userInteractions?.[0]?.id,
-      interaction: response.dialectic?.userInteractions?.[0]?.interaction,
-      type: response.dialectic?.userInteractions?.[0]?.interaction?.type,
-      value: response.dialectic?.userInteractions?.[0]?.interaction?.type?.value,
-      question: response.dialectic?.userInteractions?.[0]?.interaction?.type?.value?.question?.question,
-      answer: response.dialectic?.userInteractions?.[0]?.interaction?.type?.value?.answer?.userAnswer,
-      beliefs: response.dialectic?.userInteractions?.[0]?.interaction?.type?.value?.extractedBeliefs?.map(b => ({
-        id: b.id,
-        content: b.content?.[0]?.rawStr
-      }))
-    });
-
     const mapped = {
       dialectic: {
-        userInteractions: response.dialectic?.userInteractions?.map(i => {
-          if (!i.interaction) return null;
-          const interaction: DialecticalInteraction = {
-            id: i.id,
-            interaction: {
-              ...i.interaction,
-              type: {
-                ...i.interaction.type,
-                value: {
-                  ...i.interaction.type?.value,
-                  question: {
-                    ...i.interaction.type?.value?.question,
-                    question: question,
-                    createdAtMillisUtc: "0"
-                  },
-                  answer: {
-                    ...i.interaction.type?.value?.answer,
-                    createdAtMillisUtc: i.interaction.type?.value?.answer?.createdAtMillisUtc?.toString() || "0"
-                  }
+        userInteractions: response.dialectic?.userInteractions
+          .reduce((acc, curr) => {
+            if (!curr.interaction) return acc;
+            const type = curr.interaction.type?.case;
+            if (!acc.some(i => i.interaction?.type?.case === type)) {
+              acc.push(curr);
+            }
+            return acc;
+          }, [] as typeof response.dialectic.userInteractions)
+          .map(i => {
+            if (!i.interaction) return null;
+            
+            const mappedValue = mapInteractionValue(i.interaction);
+            if (!mappedValue) return null;
+
+            if (mappedValue.type === 'questionAnswer') {
+              mappedValue.question = question;
+              mappedValue.answer = answer;
+            }
+
+            return {
+              id: i.id,
+              interaction: {
+                type: {
+                  value: mappedValue
                 }
               }
-            }
-          };
-          return interaction;
-        }).filter((i): i is DialecticalInteraction => i !== null)
+            };
+          })
+          .filter((i): i is DialecticalInteraction => i !== null)
       }
     };
 
-    console.log('Mapped response:', JSON.stringify(mapped, replacer, 2));
     return mapped;
   }
 
