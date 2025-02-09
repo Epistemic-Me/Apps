@@ -4,10 +4,11 @@ Implements belief analysis and learning progress tracking.
 """
 
 import os
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from openai import OpenAI
 import json
 import logging
+import re
 
 class BeliefAnalyzer:
     """
@@ -50,7 +51,14 @@ class BeliefAnalyzer:
             raise ValueError("OpenAI API key must be provided or set in OPENAI_API_KEY env var")
         
         self.client = OpenAI(api_key=self.api_key)
-        self.model = "gpt-4"  # Can be made configurable
+        self.model = "gpt-4o"  # Points to gpt-4o-2024-08-06
+        
+    def _clean_json_response(self, content: str) -> str:
+        """Clean the JSON response by removing markdown code blocks."""
+        # Remove markdown code block markers if present
+        content = re.sub(r'^```json\s*', '', content)
+        content = re.sub(r'\s*```$', '', content)
+        return content.strip()
         
     def analyze_learning_progress(self, 
                                 learning_objective: Dict[str, Any], 
@@ -75,6 +83,10 @@ class BeliefAnalyzer:
                 - topic_coverage: Dict[str, Dict] for each topic
                 - quality_metrics: Dict[str, float]
                 - suggested_questions: List[str]
+                
+        Raises:
+            ValueError: If the response cannot be parsed as valid JSON
+            Exception: For other errors during analysis
         """
         # Prepare the system prompt
         system_prompt = self._create_analysis_prompt(learning_objective, belief_system)
@@ -85,13 +97,20 @@ class BeliefAnalyzer:
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": "Please provide the comprehensive analysis."}
+                    {"role": "user", "content": "Please provide the comprehensive analysis in valid JSON format."}
                 ],
                 temperature=0.2  # Lower temperature for more consistent analysis
             )
             
-            # Parse the response
-            analysis = json.loads(response.choices[0].message.content)
+            # Get the response content and clean it
+            content = self._clean_json_response(response.choices[0].message.content)
+            
+            try:
+                # Parse the response
+                analysis = json.loads(content)
+            except json.JSONDecodeError as e:
+                logging.error(f"Failed to parse JSON response: {content}")
+                raise ValueError(f"OpenAI response was not valid JSON: {str(e)}")
             
             # Validate and clean the analysis
             return self._validate_analysis(analysis)
