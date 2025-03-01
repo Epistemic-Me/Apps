@@ -178,3 +178,110 @@ Return a JSON object with EXACTLY this structure:
             analysis["quality_metrics"][metric] = max(0, min(1, score))
             
         return analysis 
+
+    def analyze_beliefs(self, beliefs: list, learning_objective: dict) -> dict:
+        """
+        Analyze a list of beliefs against a learning objective.
+        
+        Args:
+            beliefs: List of belief dictionaries with content, type, evidence, topic, and confidence
+            learning_objective: Dictionary with description, topics, and required_aspects
+        
+        Returns:
+            Dictionary containing analysis results
+        """
+        client = OpenAI(api_key=self.api_key)
+        
+        # Prepare the analysis prompt
+        prompt = f"""Analyze the following beliefs against the learning objective:
+
+Learning Objective: {learning_objective['description']}
+Required Topics: {', '.join(learning_objective['topics'])}
+Required Aspects: {', '.join(learning_objective['required_aspects'])}
+
+Beliefs:
+{json.dumps(beliefs, indent=2)}
+
+Analyze these beliefs and provide:
+1. Coverage and quality metrics for each topic
+2. Key insights gained from each topic
+3. Suggested areas for further exploration
+
+Format the response as a JSON object with this structure:
+{{
+    "topic_coverage": {{
+        "topic_name": {{
+            "coverage": float,  // Percentage coverage (0-100)
+            "quality": float,   // Quality score (0-10)
+            "insights": [str],  // List of key insights
+        }}
+    }},
+    "suggestions": [str]  // List of suggested focus areas
+}}"""
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are an expert in analyzing learning progress and belief systems."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+            
+            # Parse the response
+            analysis_text = response.choices[0].message.content
+            # Extract JSON from the response (it might be wrapped in markdown code blocks)
+            json_match = re.search(r'```json\n(.*)\n```', analysis_text, re.DOTALL)
+            if json_match:
+                analysis_text = json_match.group(1)
+            
+            analysis = json.loads(analysis_text)
+            return analysis
+            
+        except Exception as e:
+            logging.error(f"Error in belief analysis: {str(e)}")
+            return {
+                "topic_coverage": {},
+                "suggestions": ["Error in analysis: " + str(e)]
+            }
+
+    def calculate_topic_coverage(self, beliefs, topics):
+        """Calculate how well the beliefs cover the given topics."""
+        covered_topics = set()
+        for belief in beliefs:
+            topic = belief.get("topic")
+            if topic in topics:
+                covered_topics.add(topic)
+        return len(covered_topics) / len(topics) if topics else 0.0
+
+    def assess_insight_quality(self, belief):
+        """Assess the quality of insights in a belief."""
+        content = belief.get("content", "").lower()
+        
+        # Check for specific quality indicators
+        quality_indicators = {
+            "specific_examples": bool(re.search(r"for (example|instance)|like when|such as", content)),
+            "personal_experience": bool(re.search(r"i (found|noticed|realized|discovered|learned)", content)),
+            "cause_effect": bool(re.search(r"because|therefore|as a result|this leads to|which means", content)),
+            "reflection": bool(re.search(r"i think|in my experience|i believe|i feel|i've found", content))
+        }
+        
+        # Calculate quality score (0.0 to 1.0)
+        return sum(quality_indicators.values()) / len(quality_indicators)
+
+    def assess_personal_relevance(self, belief):
+        """Assess how personally relevant and applicable the belief is."""
+        content = belief.get("content", "").lower()
+        
+        # Check for personal relevance indicators
+        relevance_indicators = {
+            "personal_pronouns": bool(re.search(r"\b(i|my|me|mine)\b", content)),
+            "action_oriented": bool(re.search(r"\b(do|did|tried|started|implemented|practice)\b", content)),
+            "specific_context": bool(re.search(r"when i|during|while|in the|at (work|home|gym)", content)),
+            "impact_description": bool(re.search(r"helps|improved|noticed|felt|experienced", content))
+        }
+        
+        # Calculate relevance score (0.0 to 1.0)
+        return sum(relevance_indicators.values()) / len(relevance_indicators)
