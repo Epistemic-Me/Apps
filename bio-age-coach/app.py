@@ -11,6 +11,7 @@ from src.chatbot.coach import BioAgeCoach
 from src.database.db_connector import DatabaseConnector, initialize_coach_with_user_data
 from src.database.init_db import init_database
 from dotenv import load_dotenv
+import datetime
 
 # Set page configuration - this must be the first Streamlit command
 st.set_page_config(page_title="Bio Age Coach", page_icon="🧬", layout="wide")
@@ -692,29 +693,85 @@ def main():
         else:
             st.error("Database is not initialized")
         
-        # Add reinitialize button
-        if st.button("Reinitialize Sample Data"):
+        # Add database reset section
+        st.write("---")
+        st.subheader("Reset Database")
+        st.caption("Warning: This will delete all existing data!")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🗑️ Delete Database"):
+                try:
+                    # Close database connection
+                    if hasattr(st.session_state, 'db'):
+                        del st.session_state.db
+                    
+                    # Remove the database file
+                    if os.path.exists(db_path):
+                        os.remove(db_path)
+                        st.session_state.db_initialized = False
+                        st.success("Database deleted successfully")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Error deleting database: {str(e)}")
+        
+        with col2:
+            if st.button("🔄 Reinitialize"):
+                try:
+                    # Ensure the data directory exists
+                    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+                    
+                    # Initialize the database
+                    init_database(db_path)
+                    
+                    # Reconnect to the database
+                    st.session_state.db = DatabaseConnector(db_path)
+                    st.session_state.db_initialized = True
+                    
+                    # Verify the database has users
+                    users = st.session_state.db.get_all_users()
+                    if users:
+                        st.success("Database reinitialized successfully")
+                        st.rerun()
+                    else:
+                        st.error("Database reinitialized but no users found")
+                except Exception as e:
+                    st.error(f"Error reinitializing database: {str(e)}")
+        
+        # Add section for creating new sample users
+        st.write("---")
+        st.subheader("Create Sample User")
+        st.caption("Add a new user with specified data completeness")
+        
+        # Generate default username and email
+        default_username = f"user_{datetime.datetime.now().strftime('%m%d_%H%M')}"
+        default_email = f"{default_username}@example.com"
+        
+        # Input fields for new user with defaults
+        new_username = st.text_input("Username", value=default_username, help="Change if desired, or use default generated username")
+        new_email = st.text_input("Email", value=default_email, help="Change if desired, or use default generated email")
+        target_completion = st.slider("Target Data Completion %", min_value=0, max_value=100, value=80, step=10, 
+                                    help="This will evenly distribute data across all health categories")
+        
+        # Add button to create user
+        if st.button("Create Sample User"):
             try:
-                # Ensure the data directory exists
-                os.makedirs(os.path.dirname(db_path), exist_ok=True)
+                # Create new user in database
+                new_user = {
+                    "username": new_username,
+                    "email": new_email,
+                    "target_completion": target_completion / 100.0  # Convert to decimal
+                }
                 
-                # Initialize the database
-                init_database(db_path)
+                # Add user to database with specified completion level
+                user_id = st.session_state.db.add_sample_user(new_user)
+                st.success(f"Created new user '{new_username}' with {target_completion}% target completion")
                 
-                # Reconnect to the database
-                st.session_state.db = DatabaseConnector(db_path)
-                st.session_state.db_initialized = True
-                
-                # Verify the database has users
-                users = st.session_state.db.get_all_users()
-                if users:
-                    print("Database reinitialized successfully")  # Use print instead of st.toast for initialization
-                    # Force a rerun to update the UI
-                    st.rerun()
-                else:
-                    print("Database reinitialized but no users found")  # Use print instead of st.error for initialization
+                # Update selected user to the newly created one
+                st.session_state.selected_user_id = user_id
+                st.rerun()
             except Exception as e:
-                print(f"Error reinitializing database: {str(e)}")  # Use print instead of st.error for initialization
+                st.error(f"Error creating user: {str(e)}")
     
     # User selection in sidebar if database is available
     if st.session_state.db_initialized:

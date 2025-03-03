@@ -155,6 +155,12 @@ class BioAgeCoach:
             # Get next prompt based on conversation stage
             next_prompt = self._get_stage_prompt()
         
+        # Create system prompt with current user data
+        system_prompt = SYSTEM_PROMPT + "\n\nCurrent user data:\n" + json.dumps(self.user_data, indent=2)
+        
+        # Update system message with current data
+        self.messages[0] = {"role": "system", "content": system_prompt}
+        
         # Prepare messages for API call
         if next_prompt:
             # If we have a specific prompt for this stage, use it

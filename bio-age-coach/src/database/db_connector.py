@@ -8,6 +8,7 @@ and retrieve user health data for the Bio Age Coach.
 import os
 import sqlite3
 import datetime
+import random
 from typing import Dict, List, Any, Optional, Tuple
 
 
@@ -318,6 +319,119 @@ class DatabaseConnector:
             "capabilities": capabilities,
             "lab_results": lab_results
         }
+
+    def add_sample_user(self, user_data: Dict[str, Any]) -> int:
+        """
+        Add a new sample user with specified data completeness.
+        
+        Args:
+            user_data: Dictionary containing:
+                - username: User's username
+                - email: User's email
+                - target_completion: Target data completion (0.0 to 1.0)
+                
+        Returns:
+            ID of the newly created user
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        try:
+            # Insert the new user
+            cursor.execute(
+                "INSERT INTO users (username, email) VALUES (?, ?)",
+                (user_data["username"], user_data["email"])
+            )
+            user_id = cursor.lastrowid
+            
+            # Get today's date
+            today = datetime.date.today()
+            
+            # Calculate how many data points to include based on target completion
+            completion = user_data["target_completion"]
+            
+            # Generate data for each category based on completion percentage
+            if completion > 0:  # Include data if completion > 0%
+                # Calculate number of categories to fill based on completion
+                categories = ["daily_health", "biomarkers", "measurements", "bio_age_tests", "capabilities", "lab_results"]
+                num_categories = len(categories)
+                categories_to_fill = max(1, int(round(num_categories * completion)))
+                
+                # Randomly select which categories to fill to avoid bias
+                categories_to_use = random.sample(categories, categories_to_fill)
+                
+                # Daily health data is handled specially due to multiple days
+                if "daily_health" in categories_to_use:
+                    days_to_include = int(14 * completion)
+                    for days_ago in range(days_to_include):
+                        date = today - datetime.timedelta(days=days_ago)
+                        daily_data = (
+                            user_id,
+                            date,
+                            random.uniform(300, 500),  # active_calories
+                            random.randint(3000, 8000),  # steps
+                            random.uniform(6, 8),  # sleep_hours
+                            random.randint(55, 75),  # resting_heart_rate
+                            random.randint(110, 130),  # blood_pressure_systolic
+                            random.randint(70, 85),  # blood_pressure_diastolic
+                            random.uniform(70, 95)  # daily_score
+                        )
+                        cursor.execute("""
+                            INSERT INTO daily_health 
+                            (user_id, date, active_calories, steps, sleep_hours, 
+                             resting_heart_rate, blood_pressure_systolic, 
+                             blood_pressure_diastolic, daily_score)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, daily_data)
+                
+                # Add biomarkers
+                if "biomarkers" in categories_to_use:
+                    cursor.execute("""
+                        INSERT INTO biomarkers 
+                        (user_id, date, hba1c, hdl, ldl, triglycerides, crp, fasting_glucose)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (user_id, today, 5.2, 58.4, 81.0, 135.0, 0.3, 72.4))
+                
+                # Add measurements
+                if "measurements" in categories_to_use:
+                    cursor.execute("""
+                        INSERT INTO measurements 
+                        (user_id, date, body_fat, waist_circumference, hip_circumference, waist_to_hip)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (user_id, today, 18.5, 82.0, 98.0, 0.84))
+                
+                # Add bio-age tests
+                if "bio_age_tests" in categories_to_use:
+                    cursor.execute("""
+                        INSERT INTO bio_age_tests 
+                        (user_id, date, push_ups, grip_strength, one_leg_stand, vo2_max)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (user_id, today, 30, 90.0, 42.0, 38.0))
+                
+                # Add capabilities
+                if "capabilities" in categories_to_use:
+                    cursor.execute("""
+                        INSERT INTO capabilities 
+                        (user_id, date, plank, sit_and_reach)
+                        VALUES (?, ?, ?, ?)
+                    """, (user_id, today, 45.0, 0.2))
+                
+                # Add lab results
+                if "lab_results" in categories_to_use:
+                    cursor.execute("""
+                        INSERT INTO lab_results 
+                        (user_id, date, vitamin_d)
+                        VALUES (?, ?, ?)
+                    """, (user_id, today, 32.0))
+            
+            conn.commit()
+            return user_id
+            
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
 
 
 class CoachDataMapper:
