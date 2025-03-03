@@ -9,6 +9,7 @@ import numpy as np
 import json
 from src.chatbot.coach import BioAgeCoach
 from src.database.db_connector import DatabaseConnector, initialize_coach_with_user_data
+from src.database.init_db import init_database
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -17,6 +18,15 @@ load_dotenv()
 # Ensure data directory exists
 if not os.path.exists("data"):
     os.makedirs("data")
+
+# Initialize database if it doesn't exist
+db_path = "data/test_database.db"
+if not os.path.exists(db_path):
+    try:
+        init_database(db_path)
+        print(f"Database initialized at {db_path}")
+    except Exception as e:
+        print(f"Error initializing database: {e}")
 
 # Default biomarkers data
 DEFAULT_BIOMARKERS = {
@@ -629,21 +639,49 @@ def main():
         for category_key, category_data in st.session_state.coach.biomarkers.get("categories", {}).items():
             st.session_state.category_options[category_key] = category_data.get("display_name", category_key)
     
-    if "db_initialized" not in st.session_state:
-        try:
-            # Initialize database connector
-            db_path = "data/test_database.db"
-            if os.path.exists(db_path):
-                st.session_state.db = DatabaseConnector(db_path)
-                st.session_state.db_initialized = True
-            else:
-                st.session_state.db_initialized = False
-        except Exception as e:
-            st.session_state.db_initialized = False
-            st.error(f"Failed to initialize database: {e}")
-    
     # Main layout
     st.sidebar.title("🧬 Bio Age Coach")
+    
+    # Initialize database connector if not already done
+    if "db_initialized" not in st.session_state:
+        try:
+            db_path = "data/test_database.db"
+            # Try to initialize the database if it doesn't exist
+            if not os.path.exists(db_path):
+                init_database(db_path)
+                st.toast("Database initialized with sample data!")
+            
+            # Connect to the database
+            st.session_state.db = DatabaseConnector(db_path)
+            st.session_state.db_initialized = True
+            
+            # Verify database has users
+            users = st.session_state.db.get_all_users()
+            if not users:
+                # If no users found, try to reinitialize
+                init_database(db_path)
+                st.toast("Database reinitialized with sample data!")
+        except Exception as e:
+            st.session_state.db_initialized = False
+            st.error(f"Database initialization failed: {str(e)}")
+            st.info("Please check the application logs for more details.")
+    
+    # Add database initialization section in sidebar
+    with st.sidebar.expander("⚙️ Database Management", expanded=False):
+        st.caption("Initialize or reset the database with sample data.")
+        if st.button("Reinitialize Sample Data"):
+            try:
+                db_path = "data/test_database.db"
+                # Ensure the data directory exists
+                os.makedirs(os.path.dirname(db_path), exist_ok=True)
+                # Initialize the database
+                init_database(db_path)
+                st.success("Database reinitialized successfully with sample data!")
+                # Force a rerun to update the UI
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error reinitializing database: {str(e)}")
+                st.info("Please check the logs for more details.")
     
     # User selection in sidebar if database is available
     if st.session_state.db_initialized:
@@ -677,17 +715,21 @@ def main():
     else:
         st.sidebar.warning("Database not initialized. Using manual data entry mode.")
         
-        # Add a button to run the data generation script
+        # Add a button to initialize the database directly
         if st.sidebar.button("Generate Test Database"):
             try:
-                import subprocess
-                result = subprocess.run(["python", "scripts/generate_test_data.py"], capture_output=True, text=True)
-                if result.returncode == 0:
-                    st.sidebar.success("Test database generated successfully! Please restart the app.")
-                else:
-                    st.sidebar.error(f"Error generating test database: {result.stderr}")
+                db_path = "data/test_database.db"
+                # Ensure the data directory exists
+                os.makedirs(os.path.dirname(db_path), exist_ok=True)
+                # Initialize the database
+                init_database(db_path)
+                st.session_state.db = DatabaseConnector(db_path)
+                st.session_state.db_initialized = True
+                st.sidebar.success("Test database generated successfully!")
+                st.rerun()
             except Exception as e:
-                st.sidebar.error(f"Error running script: {e}")
+                st.sidebar.error(f"Error generating test database: {str(e)}")
+                st.info("Please check the logs for more details.")
     
     # Main content area
     st.title("Bio Age Coach")
