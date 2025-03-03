@@ -23,10 +23,14 @@ if not os.path.exists("data"):
 db_path = "data/test_database.db"
 if not os.path.exists(db_path):
     try:
+        # Ensure data directory exists
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        # Initialize database with sample data
         init_database(db_path)
-        print(f"Database initialized at {db_path}")
+        st.toast("Database initialized with sample data!")
     except Exception as e:
-        print(f"Error initializing database: {e}")
+        st.error(f"Error initializing database: {e}")
+        print(f"Database initialization error: {e}")
 
 # Default biomarkers data
 DEFAULT_BIOMARKERS = {
@@ -87,16 +91,22 @@ if "user_data_loaded" not in st.session_state:
 
 if "db_initialized" not in st.session_state:
     try:
-        # Check if the database exists
-        db_path = "data/test_database.db"
-        if os.path.exists(db_path):
+        # Connect to the database
+        st.session_state.db = DatabaseConnector(db_path)
+        st.session_state.db_initialized = True
+        
+        # Verify database has users
+        users = st.session_state.db.get_all_users()
+        if not users:
+            # If no users found, try to reinitialize
+            init_database(db_path)
+            st.toast("Database reinitialized with sample data!")
+            # Reconnect to the database
             st.session_state.db = DatabaseConnector(db_path)
-            st.session_state.db_initialized = True
-        else:
-            st.session_state.db_initialized = False
     except Exception as e:
         st.session_state.db_initialized = False
-        st.error(f"Error initializing database: {e}")
+        st.error(f"Database initialization failed: {str(e)}")
+        print(f"Database connection error: {e}")
 
 # Initialize category options
 if "category_options" not in st.session_state:
@@ -669,19 +679,45 @@ def main():
     # Add database initialization section in sidebar
     with st.sidebar.expander("⚙️ Database Management", expanded=False):
         st.caption("Initialize or reset the database with sample data.")
+        
+        # Define db_path here so it's available in the button callback
+        db_path = "data/test_database.db"
+        
+        # Show current database status
+        if st.session_state.db_initialized:
+            st.success("Database is initialized and connected")
+            try:
+                users = st.session_state.db.get_all_users()
+                st.info(f"Found {len(users)} users in the database")
+            except Exception as e:
+                st.warning("Connected but unable to query users")
+        else:
+            st.error("Database is not initialized")
+        
+        # Add reinitialize button
         if st.button("Reinitialize Sample Data"):
             try:
-                db_path = "data/test_database.db"
                 # Ensure the data directory exists
                 os.makedirs(os.path.dirname(db_path), exist_ok=True)
+                
                 # Initialize the database
                 init_database(db_path)
-                st.success("Database reinitialized successfully with sample data!")
-                # Force a rerun to update the UI
-                st.rerun()
+                
+                # Reconnect to the database
+                st.session_state.db = DatabaseConnector(db_path)
+                st.session_state.db_initialized = True
+                
+                # Verify the database has users
+                users = st.session_state.db.get_all_users()
+                if users:
+                    st.success(f"Database reinitialized successfully with {len(users)} sample users!")
+                    # Force a rerun to update the UI
+                    st.rerun()
+                else:
+                    st.error("Database reinitialized but no users found")
             except Exception as e:
                 st.error(f"Error reinitializing database: {str(e)}")
-                st.info("Please check the logs for more details.")
+                print(f"Database reinitialization error: {e}")
     
     # User selection in sidebar if database is available
     if st.session_state.db_initialized:
@@ -715,21 +751,39 @@ def main():
     else:
         st.sidebar.warning("Database not initialized. Using manual data entry mode.")
         
+        # Define db_path here so it's available in the button callback
+        db_path = "data/test_database.db"
+        
         # Add a button to initialize the database directly
         if st.sidebar.button("Generate Test Database"):
             try:
-                db_path = "data/test_database.db"
                 # Ensure the data directory exists
                 os.makedirs(os.path.dirname(db_path), exist_ok=True)
+                
                 # Initialize the database
                 init_database(db_path)
+                
+                # Connect to the database and verify it has users
                 st.session_state.db = DatabaseConnector(db_path)
-                st.session_state.db_initialized = True
-                st.sidebar.success("Test database generated successfully!")
-                st.rerun()
+                users = st.session_state.db.get_all_users()
+                
+                if users:
+                    st.session_state.db_initialized = True
+                    st.sidebar.success(f"Test database generated successfully with {len(users)} sample users!")
+                    st.rerun()
+                else:
+                    st.sidebar.error("Database generated but no users found")
+                    print("Database initialization completed but no users were created")
             except Exception as e:
-                st.sidebar.error(f"Error generating test database: {str(e)}")
-                st.info("Please check the logs for more details.")
+                st.sidebar.error("Failed to generate test database")
+                print(f"Error generating test database: {e}")
+                # Try to clean up if database creation failed
+                try:
+                    if os.path.exists(db_path):
+                        os.remove(db_path)
+                        print("Cleaned up failed database file")
+                except:
+                    pass
     
     # Main content area
     st.title("Bio Age Coach")

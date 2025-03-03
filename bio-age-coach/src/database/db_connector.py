@@ -73,7 +73,7 @@ class DatabaseConnector:
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT id, username, email, date_joined, age, gender, height, weight FROM users WHERE id = ?", 
+            "SELECT id, username, email, created_at FROM users WHERE id = ?", 
             (user_id,)
         )
         row = cursor.fetchone()
@@ -101,8 +101,9 @@ class DatabaseConnector:
         
         cursor.execute(
             """
-            SELECT date, active_calories, steps, sleep_hours, daily_score 
-            FROM daily_health_data 
+            SELECT date, active_calories, steps, sleep_hours, resting_heart_rate,
+                   blood_pressure_systolic, blood_pressure_diastolic, daily_score
+            FROM daily_health 
             WHERE user_id = ? 
             ORDER BY date DESC 
             LIMIT ?
@@ -216,17 +217,89 @@ class DatabaseConnector:
         Returns:
             Dictionary with all user health data categorized
         """
-        user_info = self.get_user_info(user_id)
-        daily_data = self.get_daily_health_data(user_id)
-        biomarkers = self.get_biomarkers(user_id)
-        functional_tests = self.get_functional_tests(user_id)
-        physical_measurements = self.get_physical_measurements(user_id)
+        conn = self.get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
         
-        # Calculate averages from daily data
-        avg_calories = sum(d['active_calories'] for d in daily_data) / len(daily_data) if daily_data else 0
-        avg_steps = sum(d['steps'] for d in daily_data) / len(daily_data) if daily_data else 0
-        avg_sleep = sum(d['sleep_hours'] for d in daily_data) / len(daily_data) if daily_data else 0
-        avg_score = sum(d['daily_score'] for d in daily_data) / len(daily_data) if daily_data else 0
+        # Get user info
+        user_info = self.get_user_info(user_id)
+        
+        # Get daily health data
+        cursor.execute("""
+            SELECT date, active_calories, steps, sleep_hours, resting_heart_rate,
+                   blood_pressure_systolic, blood_pressure_diastolic, daily_score
+            FROM daily_health 
+            WHERE user_id = ? 
+            ORDER BY date DESC 
+            LIMIT 14
+        """, (user_id,))
+        daily_data = [dict(row) for row in cursor.fetchall()]
+        
+        # Get biomarkers
+        cursor.execute("""
+            SELECT date, hba1c, hdl, ldl, triglycerides, crp, fasting_glucose
+            FROM biomarkers 
+            WHERE user_id = ? 
+            ORDER BY date DESC 
+            LIMIT 1
+        """, (user_id,))
+        biomarker_row = cursor.fetchone()
+        biomarkers = dict(biomarker_row) if biomarker_row else {}
+        
+        # Get bio-age tests
+        cursor.execute("""
+            SELECT date, push_ups, grip_strength, one_leg_stand, vo2_max
+            FROM bio_age_tests 
+            WHERE user_id = ? 
+            ORDER BY date DESC 
+            LIMIT 1
+        """, (user_id,))
+        test_row = cursor.fetchone()
+        bio_age_tests = dict(test_row) if test_row else {}
+        
+        # Get measurements
+        cursor.execute("""
+            SELECT date, body_fat, waist_circumference, hip_circumference, waist_to_hip
+            FROM measurements 
+            WHERE user_id = ? 
+            ORDER BY date DESC 
+            LIMIT 1
+        """, (user_id,))
+        measurement_row = cursor.fetchone()
+        measurements = dict(measurement_row) if measurement_row else {}
+        
+        # Get capabilities
+        cursor.execute("""
+            SELECT date, plank, sit_and_reach
+            FROM capabilities 
+            WHERE user_id = ? 
+            ORDER BY date DESC 
+            LIMIT 1
+        """, (user_id,))
+        capability_row = cursor.fetchone()
+        capabilities = dict(capability_row) if capability_row else {}
+        
+        # Get lab results
+        cursor.execute("""
+            SELECT date, vitamin_d
+            FROM lab_results 
+            WHERE user_id = ? 
+            ORDER BY date DESC 
+            LIMIT 1
+        """, (user_id,))
+        lab_row = cursor.fetchone()
+        lab_results = dict(lab_row) if lab_row else {}
+        
+        conn.close()
+        
+        # Calculate averages from daily data if available
+        if daily_data:
+            avg_calories = sum(d['active_calories'] for d in daily_data) / len(daily_data)
+            avg_steps = sum(d['steps'] for d in daily_data) / len(daily_data)
+            avg_sleep = sum(d['sleep_hours'] for d in daily_data) / len(daily_data)
+            avg_score = sum(d['daily_score'] for d in daily_data) / len(daily_data)
+        else:
+            avg_calories = avg_steps = avg_sleep = avg_score = 0
         
         return {
             "user_info": user_info,
@@ -240,8 +313,10 @@ class DatabaseConnector:
                 }
             },
             "biomarkers": biomarkers,
-            "functional_tests": functional_tests,
-            "physical_measurements": physical_measurements
+            "bio_age_tests": bio_age_tests,
+            "measurements": measurements,
+            "capabilities": capabilities,
+            "lab_results": lab_results
         }
 
 
@@ -273,49 +348,55 @@ class CoachDataMapper:
         # Map daily health data averages
         if "daily_data" in data and "averages" in data["daily_data"]:
             averages = data["daily_data"]["averages"]
-            coach_data["health_data"]["active_calories"] = averages["active_calories"]
-            coach_data["health_data"]["steps"] = averages["steps"]
-            coach_data["health_data"]["sleep"] = averages["sleep_hours"]
+            coach_data["health_data"].update({
+                "active_calories": averages["active_calories"],
+                "steps": averages["steps"],
+                "sleep": averages["sleep_hours"]
+            })
+            
+            # Get the latest daily record for other health metrics
+            if data["daily_data"]["records"]:
+                latest = data["daily_data"]["records"][0]
+                if "resting_heart_rate" in latest:
+                    coach_data["health_data"]["resting_heart_rate"] = latest["resting_heart_rate"]
+                if "blood_pressure_systolic" in latest and "blood_pressure_diastolic" in latest:
+                    coach_data["health_data"]["blood_pressure_systolic"] = latest["blood_pressure_systolic"]
+                    coach_data["health_data"]["blood_pressure_diastolic"] = latest["blood_pressure_diastolic"]
         
         # Map biomarkers
-        for biomarker in data.get("biomarkers", []):
-            biomarker_id = biomarker["biomarker_id"]
-            value = biomarker["value"]
-            
-            # Categorize biomarkers based on type
-            if biomarker_id in ["hba1c", "fasting_glucose", "crp", "hdl", "ldl", "triglycerides"]:
-                coach_data["biomarkers"][biomarker_id] = value
-            elif biomarker_id in ["vitamin_d"]:
-                coach_data["lab_results"][biomarker_id] = value
+        if "biomarkers" in data:
+            biomarkers = data["biomarkers"]
+            for field in ["hba1c", "hdl", "ldl", "triglycerides", "crp", "fasting_glucose"]:
+                if field in biomarkers and biomarkers[field] is not None:
+                    coach_data["biomarkers"][field] = biomarkers[field]
         
-        # Map functional tests - fixing the mapping to UI field names
-        for test in data.get("functional_tests", []):
-            test_id = test["test_id"]
-            value = test["value"]
-            
-            # Map database test_id to the corresponding UI field names
-            if test_id == "push_ups":
-                coach_data["bio_age_tests"]["push_ups"] = value
-            elif test_id == "grip_strength":
-                coach_data["bio_age_tests"]["grip_strength"] = value
-            elif test_id == "one_leg_stand":
-                coach_data["bio_age_tests"]["one_leg_stand"] = value
-            elif test_id == "vo2_max":
-                coach_data["bio_age_tests"]["vo2_max"] = value
-            elif test_id == "plank":
-                coach_data["capabilities"]["plank"] = value
-            elif test_id == "sit_and_reach":
-                coach_data["capabilities"]["sit_and_reach"] = value
+        # Map bio-age tests
+        if "bio_age_tests" in data:
+            tests = data["bio_age_tests"]
+            for field in ["push_ups", "grip_strength", "one_leg_stand", "vo2_max"]:
+                if field in tests and tests[field] is not None:
+                    coach_data["bio_age_tests"][field] = tests[field]
         
-        # Map physical measurements
-        for measurement in data.get("physical_measurements", []):
-            measurement_id = measurement["measurement_id"]
-            value = measurement["value"]
-            
-            if measurement_id in ["body_fat", "waist_circumference", "hip_circumference", "waist_to_hip"]:
-                coach_data["measurements"][measurement_id] = value
-            elif measurement_id in ["resting_heart_rate", "blood_pressure_systolic", "blood_pressure_diastolic"]:
-                coach_data["health_data"][measurement_id] = value
+        # Map measurements
+        if "measurements" in data:
+            measurements = data["measurements"]
+            for field in ["body_fat", "waist_circumference", "hip_circumference", "waist_to_hip"]:
+                if field in measurements and measurements[field] is not None:
+                    coach_data["measurements"][field] = measurements[field]
+        
+        # Map capabilities
+        if "capabilities" in data:
+            capabilities = data["capabilities"]
+            for field in ["plank", "sit_and_reach"]:
+                if field in capabilities and capabilities[field] is not None:
+                    coach_data["capabilities"][field] = capabilities[field]
+        
+        # Map lab results
+        if "lab_results" in data:
+            lab_results = data["lab_results"]
+            for field in ["vitamin_d"]:
+                if field in lab_results and lab_results[field] is not None:
+                    coach_data["lab_results"][field] = lab_results[field]
         
         return coach_data
 
