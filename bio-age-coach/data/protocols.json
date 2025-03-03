@@ -1,0 +1,165 @@
+{
+  "protocols": [
+    {
+      "id": "time_restricted_eating",
+      "name": "Time-Restricted Eating",
+      "category": "Nutrition",
+      "description": "Limiting daily food intake to a specific time window, typically 8-10 hours",
+      "difficulty": "Medium",
+      "time_commitment": "Daily",
+      "benefits": [
+        "Improved insulin sensitivity",
+        "Reduced inflammation",
+        "Enhanced autophagy",
+        "Weight management"
+      ],
+      "targeted_biomarkers": ["hba1c", "fasting_glucose", "crp"],
+      "implementation": "Start with a 12-hour eating window (e.g., 8am to 8pm) and gradually reduce to 8-10 hours (e.g., 10am to 6pm).",
+      "evidence": "Multiple studies show improvements in glucose metabolism and inflammatory markers with 8-10 hour eating windows.",
+      "evidence_strength": "Strong",
+      "cautions": "May not be suitable for pregnant women, those with eating disorders, or those with certain medical conditions. Consult a healthcare provider.",
+      "resources": [
+        "The Circadian Code by Dr. Satchin Panda",
+        "https://www.cell.com/cell-metabolism/fulltext/S1550-4131(19)30611-4"
+      ]
+    },
+    {
+      "id": "resistance_training",
+      "name": "Progressive Resistance Training",
+      "category": "Exercise",
+      "description": "Regular strength training to build and maintain muscle mass",
+      "difficulty": "Medium",
+      "time_commitment": "2-3 times per week",
+      "benefits": [
+        "Increased muscle mass",
+        "Improved insulin sensitivity",
+        "Enhanced bone density",
+        "Increased metabolic rate"
+      ],
+      "targeted_biomarkers": ["fasting_glucose", "testosterone", "dhea_s"],
+      "implementation": "Start with 2-3 sessions per week of full-body resistance training. Focus on compound movements (squats, deadlifts, push-ups, rows) and gradually increase weight/resistance.",
+      "evidence": "Resistance training improves insulin sensitivity and increases hormonal production, particularly testosterone.",
+      "evidence_strength": "Strong",
+      "cautions": "Start with proper form and lighter weights. Consider working with a trainer initially. Those with joint issues should modify exercises accordingly.",
+      "resources": [
+        "Starting Strength by Mark Rippetoe",
+        "https://journals.physiology.org/doi/full/10.1152/japplphysiol.00497.2013"
+      ]
+    },
+    {
+      "id": "vitamin_d_supplementation",
+      "name": "Vitamin D Supplementation",
+      "category": "Supplements",
+      "description": "Regular supplementation with Vitamin D3",
+      "difficulty": "Easy",
+      "time_commitment": "Daily",
+      "benefits": [
+        "Improved immune function",
+        "Enhanced bone health",
+        "Reduced inflammation",
+        "Better mood and energy"
+      ],
+      "targeted_biomarkers": ["vitamin_d", "crp"],
+      "implementation": "Typical supplementation is 1,000-5,000 IU daily with a meal containing fat. Dosage should be based on current blood levels.",
+      "evidence": "Vitamin D deficiency is associated with increased all-cause mortality and accelerated aging.",
+      "evidence_strength": "Strong",
+      "cautions": "Very high doses can lead to toxicity. Regular blood testing is recommended when supplementing. Consult a healthcare provider for personalized dosing.",
+      "resources": [
+        "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6052644/",
+        "The Vitamin D Solution by Dr. Michael Holick"
+      ]
+    },
+    {
+      "id": "cold_exposure",
+      "name": "Cold Exposure Therapy",
+      "category": "Lifestyle",
+      "description": "Regular exposure to cold temperatures through cold showers, ice baths, or outdoor activities in cold weather",
+      "difficulty": "Hard",
+      "time_commitment": "5-15 minutes daily",
+      "benefits": [
+        "Increased brown fat activation",
+        "Improved immune function",
+        "Enhanced mood and energy",
+        "Potential for increased metabolic rate"
+      ],
+      "targeted_biomarkers": ["crp", "testosterone"],
+      "implementation": "Start with 30 seconds of cold water at the end of a shower, gradually building to 5 minutes. Alternative: ice baths starting at 2 minutes and building to 10-15 minutes at 50-60°F.",
+      "evidence": "Cold exposure activates brown adipose tissue and can increase mitochondrial efficiency. Some evidence suggests hormetic benefits for inflammation markers.",
+      "evidence_strength": "Moderate",
+      "cautions": "Not recommended for those with cardiovascular conditions, Raynaud's syndrome, or cold urticaria. Start gradually to avoid shock.",
+      "resources": [
+        "The Wim Hof Method by Wim Hof",
+        "https://www.sciencedirect.com/science/article/pii/S2666337621000236"
+      ]
+    },
+    {
+      "id": "sleep_optimization",
+      "name": "Sleep Optimization",
+      "category": "Lifestyle",
+      "description": "Improving sleep quality and duration through behavioral changes and environment optimization",
+      "difficulty": "Medium",
+      "time_commitment": "Daily",
+      "benefits": [
+        "Improved glucose metabolism",
+        "Reduced inflammation",
+        "Enhanced cellular repair",
+        "Better hormone regulation"
+      ],
+      "targeted_biomarkers": ["hba1c", "fasting_glucose", "crp", "testosterone", "dhea_s"],
+      "implementation": "Aim for 7-9 hours of quality sleep. Establish a consistent sleep schedule, create a dark, cool sleeping environment (65-68°F), avoid screens 1-2 hours before bed, and limit caffeine after noon.",
+      "evidence": "Poor sleep directly impacts glucose metabolism, increases inflammation, and disrupts hormone production.",
+      "evidence_strength": "Strong",
+      "cautions": "If sleep problems persist despite interventions, consider consulting a sleep specialist to rule out sleep disorders.",
+      "resources": [
+        "Why We Sleep by Matthew Walker",
+        "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6267703/"
+      ]
+    },
+    {
+      "id": "meditation",
+      "name": "Regular Meditation Practice",
+      "category": "Mind",
+      "description": "Daily mindfulness meditation practice",
+      "difficulty": "Medium",
+      "time_commitment": "10-20 minutes daily",
+      "benefits": [
+        "Reduced stress response",
+        "Lowered inflammation",
+        "Improved telomere maintenance",
+        "Enhanced cognitive function"
+      ],
+      "targeted_biomarkers": ["crp", "telomere_length"],
+      "implementation": "Start with 5 minutes of daily guided meditation using an app like Headspace, Calm, or Waking Up. Gradually increase to 20 minutes daily.",
+      "evidence": "Regular meditation has been shown to reduce inflammatory markers and may help maintain telomere length.",
+      "evidence_strength": "Moderate",
+      "cautions": "None significant. If anxiety increases during meditation, try guided or walking meditation alternatives.",
+      "resources": [
+        "Altered Traits by Daniel Goleman and Richard Davidson",
+        "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6137499/"
+      ]
+    },
+    {
+      "id": "b_vitamins",
+      "name": "B Vitamin Complex",
+      "category": "Supplements",
+      "description": "Supplementation with B vitamins, particularly B6, B9 (folate), and B12",
+      "difficulty": "Easy",
+      "time_commitment": "Daily",
+      "benefits": [
+        "Reduced homocysteine levels",
+        "Improved methylation",
+        "Enhanced energy metabolism",
+        "Support for nervous system health"
+      ],
+      "targeted_biomarkers": ["homocysteine"],
+      "implementation": "Take a high-quality B complex daily, preferably with active forms (methylfolate, methylcobalamin, P5P). Alternatively, specific B6 (50mg), folate (400-800mcg), and B12 (500-1000mcg) supplements.",
+      "evidence": "B vitamins are critical for proper homocysteine metabolism. Deficiencies directly lead to elevated homocysteine levels.",
+      "evidence_strength": "Strong",
+      "cautions": "Some individuals with MTHFR gene mutations may need specific forms of folate. Very high dose B6 (>200mg daily) can cause neuropathy over time.",
+      "resources": [
+        "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5697445/",
+        "The Homocysteine Revolution by Kilmer McCully"
+      ]
+    }
+  ]
+} 

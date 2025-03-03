@@ -1,0 +1,280 @@
+{
+  "categories": {
+    "health_data": {
+      "display_name": "Health Data",
+      "description": "Activity and health metrics from Apple Health or other health tracking platforms",
+      "items": [
+        {
+          "id": "steps",
+          "name": "Daily Steps",
+          "description": "Average daily step count over the past week",
+          "unit": "steps",
+          "normal_range": {
+            "min": 7000,
+            "max": 15000,
+            "optimal": 10000
+          },
+          "age_impact": "Regular physical activity correlates with lower biological age. Consistently hitting 10,000+ steps may reduce biological age by 1-2 years.",
+          "importance": 3
+        },
+        {
+          "id": "sleep",
+          "name": "Sleep Duration",
+          "description": "Average nightly sleep duration over the past week",
+          "unit": "hours",
+          "normal_range": {
+            "min": 7,
+            "max": 9,
+            "optimal": 8
+          },
+          "age_impact": "Chronic sleep deprivation accelerates biological aging. Each hour below 7 hours may add 0.5-1 year to biological age.",
+          "importance": 4
+        },
+        {
+          "id": "active_calories",
+          "name": "Active Calories",
+          "description": "Average daily active calories burned",
+          "unit": "kcal",
+          "normal_range": {
+            "min": 400,
+            "max": 1000,
+            "optimal": 700
+          },
+          "age_impact": "Higher active energy expenditure correlates with lower biological age and reduced mortality risk.",
+          "importance": 3
+        }
+      ]
+    },
+    "bio_age_tests": {
+      "display_name": "Bio Age Tests",
+      "description": "Functional tests that correlate with biological age",
+      "items": [
+        {
+          "id": "push_ups",
+          "name": "Continuous Push-ups",
+          "description": "Maximum number of push-ups completed in one set",
+          "unit": "count",
+          "normal_range": {
+            "min": 15,
+            "max": 40,
+            "optimal": 30
+          },
+          "age_impact": "Push-up capacity inversely correlates with cardiovascular disease risk and biological age.",
+          "importance": 3
+        },
+        {
+          "id": "grip_strength",
+          "name": "Grip Strength (Dominant)",
+          "description": "Maximum grip strength of the dominant hand",
+          "unit": "lbs",
+          "normal_range": {
+            "min": 80,
+            "max": 140,
+            "optimal": 120
+          },
+          "age_impact": "Grip strength is a strong predictor of longevity and biological age. Each 10% reduction below age-expected strength may add 1-2 years to biological age.",
+          "importance": 4
+        },
+        {
+          "id": "one_leg_stand",
+          "name": "One-Leg Stand",
+          "description": "Duration able to stand on one leg with eyes closed",
+          "unit": "seconds",
+          "normal_range": {
+            "min": 20,
+            "max": 60,
+            "optimal": 45
+          },
+          "age_impact": "Balance ability correlates with brain health and lower biological age.",
+          "importance": 3
+        }
+      ]
+    },
+    "capabilities": {
+      "display_name": "Capabilities",
+      "description": "Broader functional health capabilities beyond standard bio age tests",
+      "items": [
+        {
+          "id": "vo2_max",
+          "name": "VO2 Max",
+          "description": "Maximum oxygen consumption during exercise",
+          "unit": "ml/kg/min",
+          "normal_range": {
+            "min": 35,
+            "max": 55,
+            "optimal": 45
+          },
+          "age_impact": "Higher cardiorespiratory fitness correlates with lower biological age. Each 5 ml/kg/min increase above average may reduce biological age by 2-3 years.",
+          "importance": 5
+        },
+        {
+          "id": "cognitive_speed",
+          "name": "Cognitive Processing Speed",
+          "description": "Reaction time in cognitive processing tasks",
+          "unit": "ms",
+          "normal_range": {
+            "min": 200,
+            "max": 350,
+            "optimal": 250
+          },
+          "age_impact": "Faster cognitive processing speed correlates with lower biological age and better brain health.",
+          "importance": 4
+        },
+        {
+          "id": "recovery_rate",
+          "name": "Heart Rate Recovery",
+          "description": "Decrease in heart rate one minute after peak exercise",
+          "unit": "bpm",
+          "normal_range": {
+            "min": 15,
+            "max": 40,
+            "optimal": 25
+          },
+          "age_impact": "Faster heart rate recovery indicates better autonomic function and correlates with lower biological age.",
+          "importance": 4
+        }
+      ]
+    },
+    "biomarkers": {
+      "display_name": "Biomarkers",
+      "description": "Standard medical biomarkers from blood and urine tests",
+      "items": [
+        {
+          "id": "hba1c",
+          "name": "HbA1c",
+          "full_name": "Glycated Hemoglobin",
+          "description": "Measures average blood glucose levels over the past 2-3 months",
+          "unit": "%",
+          "normal_range": {
+            "min": 4.0,
+            "max": 5.6,
+            "optimal": 5.0
+          },
+          "age_impact": "Higher HbA1c correlates with increased biological age. Each 1% increase above optimal may add 4-6 years to biological age.",
+          "evidence_strength": "Strong",
+          "importance": 5
+        },
+        {
+          "id": "fasting_glucose",
+          "name": "Fasting Glucose",
+          "full_name": "Fasting Blood Glucose",
+          "description": "Measures blood sugar levels after an overnight fast",
+          "unit": "mg/dL",
+          "normal_range": {
+            "min": 70,
+            "max": 99,
+            "optimal": 85
+          },
+          "age_impact": "Elevated fasting glucose accelerates aging through glycation and oxidative stress. Levels above 100 mg/dL may add 2-3 years to biological age.",
+          "evidence_strength": "Strong",
+          "importance": 4
+        },
+        {
+          "id": "crp",
+          "name": "hs-CRP",
+          "full_name": "High-Sensitivity C-Reactive Protein",
+          "description": "Marker of systemic inflammation",
+          "unit": "mg/L",
+          "normal_range": {
+            "min": 0,
+            "max": 3.0,
+            "optimal": 0.8
+          },
+          "age_impact": "Chronic inflammation accelerates cellular aging. CRP levels above 3.0 mg/L may add 3-4 years to biological age.",
+          "evidence_strength": "Strong",
+          "importance": 5
+        }
+      ]
+    },
+    "measurements": {
+      "display_name": "Measurements",
+      "description": "Physical body measurements",
+      "items": [
+        {
+          "id": "body_fat",
+          "name": "Body Fat Percentage",
+          "description": "Percentage of total body mass that is fat",
+          "unit": "%",
+          "normal_range": {
+            "min": 10,
+            "max": 20,
+            "optimal": 15
+          },
+          "age_impact": "Higher body fat percentage, especially visceral fat, correlates with increased biological age.",
+          "importance": 4
+        },
+        {
+          "id": "waist_to_height",
+          "name": "Waist-to-Height Ratio",
+          "description": "Ratio of waist circumference to height",
+          "unit": "ratio",
+          "normal_range": {
+            "min": 0.4,
+            "max": 0.5,
+            "optimal": 0.45
+          },
+          "age_impact": "Higher waist-to-height ratio correlates with increased metabolic risk and biological age.",
+          "importance": 4
+        },
+        {
+          "id": "muscle_mass",
+          "name": "Muscle Mass",
+          "description": "Total skeletal muscle mass",
+          "unit": "kg",
+          "normal_range": {
+            "min": 30,
+            "max": 45,
+            "optimal": 38
+          },
+          "age_impact": "Higher muscle mass correlates with lower biological age and improved metabolic health.",
+          "importance": 3
+        }
+      ]
+    },
+    "lab_results": {
+      "display_name": "Lab Results",
+      "description": "Advanced lab tests including epigenetic and other aging tests",
+      "items": [
+        {
+          "id": "telomere_length",
+          "name": "Telomere Length",
+          "description": "Average length of telomeres in white blood cells",
+          "unit": "kb",
+          "normal_range": {
+            "min": 5,
+            "max": 10,
+            "optimal": 7.5
+          },
+          "age_impact": "Shorter telomeres directly correlate with increased biological age. Each 1kb reduction below average for age may add 3-5 years to biological age.",
+          "importance": 5
+        },
+        {
+          "id": "dna_methylation",
+          "name": "DNA Methylation Age",
+          "description": "Epigenetic biological age based on DNA methylation patterns",
+          "unit": "years",
+          "normal_range": {
+            "min": "chronological age - 10",
+            "max": "chronological age + 5",
+            "optimal": "chronological age - 5"
+          },
+          "age_impact": "DNA methylation age is one of the most accurate measures of biological age.",
+          "importance": 5
+        },
+        {
+          "id": "glycan_age",
+          "name": "GlycanAge",
+          "description": "Biological age based on glycan profiles",
+          "unit": "years",
+          "normal_range": {
+            "min": "chronological age - 10",
+            "max": "chronological age + 5",
+            "optimal": "chronological age - 5"
+          },
+          "age_impact": "Glycan profiles provide insight into immune system aging and overall biological age.",
+          "importance": 4
+        }
+      ]
+    }
+  }
+} 
