@@ -12,6 +12,9 @@ from src.database.db_connector import DatabaseConnector, initialize_coach_with_u
 from src.database.init_db import init_database
 from dotenv import load_dotenv
 
+# Set page configuration - this must be the first Streamlit command
+st.set_page_config(page_title="Bio Age Coach", page_icon="🧬", layout="wide")
+
 # Load environment variables
 load_dotenv()
 
@@ -27,10 +30,9 @@ if not os.path.exists(db_path):
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         # Initialize database with sample data
         init_database(db_path)
-        st.toast("Database initialized with sample data!")
+        print("Database initialized successfully")  # Use print instead of st.toast for initialization
     except Exception as e:
-        st.error(f"Error initializing database: {e}")
-        print(f"Database initialization error: {e}")
+        print(f"Error initializing database: {e}")  # Use print instead of st.error for initialization
 
 # Default biomarkers data
 DEFAULT_BIOMARKERS = {
@@ -100,13 +102,12 @@ if "db_initialized" not in st.session_state:
         if not users:
             # If no users found, try to reinitialize
             init_database(db_path)
-            st.toast("Database reinitialized with sample data!")
+            print("Database reinitialized successfully")  # Use print instead of st.toast for initialization
             # Reconnect to the database
             st.session_state.db = DatabaseConnector(db_path)
     except Exception as e:
         st.session_state.db_initialized = False
-        st.error(f"Database initialization failed: {str(e)}")
-        print(f"Database connection error: {e}")
+        print(f"Database connection error: {e}")  # Use print instead of st.error for initialization
 
 # Initialize category options
 if "category_options" not in st.session_state:
@@ -164,7 +165,7 @@ def draw_completeness_chart(completeness_data):
 def load_user_data(user_id):
     """Load user data from the database into the coach."""
     if not st.session_state.db_initialized:
-        st.error("Database is not initialized")
+        print("Database is not initialized")  # Use print instead of st.error for initialization
         return False
     
     try:
@@ -200,10 +201,10 @@ def load_user_data(user_id):
             
             return True
         else:
-            st.error("No data found for selected user")
+            print("No data found for selected user")  # Use print instead of st.error for initialization
             return False
     except Exception as e:
-        st.error(f"Error loading user data: {e}")
+        print(f"Error loading user data: {e}")  # Use print instead of st.error for initialization
         return False
 
 def get_daily_health_summary(user_id):
@@ -236,7 +237,7 @@ def get_daily_health_summary(user_id):
         
         return summary
     except Exception as e:
-        print(f"Error getting daily health summary: {e}")
+        print(f"Error getting daily health summary: {e}")  # Use print instead of st.error for initialization
         return None
 
 def display_health_data_profile(coach):
@@ -625,9 +626,6 @@ def show_daily_health_dashboard(user_id):
 
 def main():
     """Main function to run the Bio Age Coach."""
-    # Set page configuration
-    st.set_page_config(page_title="Bio Age Coach", page_icon="🧬", layout="wide")
-    
     # Initialize all session state variables at the start
     if "coach" not in st.session_state:
         st.session_state.coach = BioAgeCoach()
@@ -659,7 +657,7 @@ def main():
             # Try to initialize the database if it doesn't exist
             if not os.path.exists(db_path):
                 init_database(db_path)
-                st.toast("Database initialized with sample data!")
+                print("Database initialized successfully")  # Use print instead of st.toast for initialization
             
             # Connect to the database
             st.session_state.db = DatabaseConnector(db_path)
@@ -670,10 +668,10 @@ def main():
             if not users:
                 # If no users found, try to reinitialize
                 init_database(db_path)
-                st.toast("Database reinitialized with sample data!")
+                print("Database reinitialized successfully")  # Use print instead of st.toast for initialization
         except Exception as e:
             st.session_state.db_initialized = False
-            st.error(f"Database initialization failed: {str(e)}")
+            print(f"Database initialization failed: {str(e)}")  # Use print instead of st.error for initialization
             st.info("Please check the application logs for more details.")
     
     # Add database initialization section in sidebar
@@ -710,14 +708,13 @@ def main():
                 # Verify the database has users
                 users = st.session_state.db.get_all_users()
                 if users:
-                    st.success(f"Database reinitialized successfully with {len(users)} sample users!")
+                    print("Database reinitialized successfully")  # Use print instead of st.toast for initialization
                     # Force a rerun to update the UI
                     st.rerun()
                 else:
-                    st.error("Database reinitialized but no users found")
+                    print("Database reinitialized but no users found")  # Use print instead of st.error for initialization
             except Exception as e:
-                st.error(f"Error reinitializing database: {str(e)}")
-                print(f"Database reinitialization error: {e}")
+                print(f"Error reinitializing database: {str(e)}")  # Use print instead of st.error for initialization
     
     # User selection in sidebar if database is available
     if st.session_state.db_initialized:
@@ -769,19 +766,20 @@ def main():
                 
                 if users:
                     st.session_state.db_initialized = True
+                    print("Test database generated successfully")  # Use print instead of st.toast for initialization
                     st.sidebar.success(f"Test database generated successfully with {len(users)} sample users!")
                     st.rerun()
                 else:
+                    print("Database generated but no users found")  # Use print instead of st.error for initialization
                     st.sidebar.error("Database generated but no users found")
-                    print("Database initialization completed but no users were created")
             except Exception as e:
+                print(f"Error generating test database: {e}")  # Use print instead of st.error for initialization
                 st.sidebar.error("Failed to generate test database")
-                print(f"Error generating test database: {e}")
                 # Try to clean up if database creation failed
                 try:
                     if os.path.exists(db_path):
                         os.remove(db_path)
-                        print("Cleaned up failed database file")
+                        print("Cleaned up failed database file")  # Use print instead of st.info for cleanup completion
                 except:
                     pass
     
