@@ -37,19 +37,12 @@ class BioAgeCoach:
     This class manages the conversation flow and state for the Bio Age Coach chatbot.
     """
     
-    def __init__(self, biomarkers_path: str = "data/biomarkers.json", protocols_path: str = "data/protocols.json"):
-        """
-        Initialize the BioAgeCoach with biomarker and protocol data.
-        
-        Args:
-            biomarkers_path: Path to the biomarkers JSON file
-            protocols_path: Path to the protocols JSON file
-        """
-        self.biomarkers = self._load_json(biomarkers_path)
-        self.protocols = self._load_json(protocols_path)
-        
-        # Initialize conversation state
+    def __init__(self):
+        """Initialize the Bio Age Coach."""
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.messages = []
+        
+        # Initialize empty user data structure
         self.user_data = {
             "health_data": {},
             "bio_age_tests": {},
@@ -58,6 +51,53 @@ class BioAgeCoach:
             "measurements": {},
             "lab_results": {}
         }
+        
+        # Load biomarkers data
+        try:
+            with open("data/biomarkers.json", "r") as f:
+                self.biomarkers = json.load(f)
+        except Exception as e:
+            print(f"Error loading data/biomarkers.json: {e}")
+            # Use default biomarkers if file can't be loaded
+            self.biomarkers = {
+                "categories": {
+                    "health_data": {
+                        "display_name": "Daily Health Data",
+                        "items": [
+                            {"id": "active_calories", "name": "Active Calories", "unit": "kcal"},
+                            {"id": "steps", "name": "Steps", "unit": "steps"},
+                            {"id": "sleep", "name": "Sleep Duration", "unit": "hours"},
+                            {"id": "resting_heart_rate", "name": "Resting Heart Rate", "unit": "bpm"}
+                        ]
+                    },
+                    "bio_age_tests": {
+                        "display_name": "Bio-Age Tests",
+                        "items": [
+                            {"id": "push_ups", "name": "Push-ups", "unit": "reps"},
+                            {"id": "grip_strength", "name": "Grip Strength", "unit": "kg"},
+                            {"id": "one_leg_stand", "name": "One-Leg Stand", "unit": "seconds"}
+                        ]
+                    },
+                    "biomarkers": {
+                        "display_name": "Biomarkers",
+                        "items": [
+                            {"id": "hba1c", "name": "HbA1c", "unit": "%"},
+                            {"id": "hdl", "name": "HDL Cholesterol", "unit": "mg/dL"},
+                            {"id": "ldl", "name": "LDL Cholesterol", "unit": "mg/dL"}
+                        ]
+                    }
+                }
+            }
+        
+        # Load protocols data
+        try:
+            with open("data/protocols.json", "r") as f:
+                self.protocols = json.load(f)
+        except Exception as e:
+            print(f"Error loading data/protocols.json: {e}")
+            self.protocols = {"protocols": []}
+        
+        # Initialize conversation state
         self.user_habits = []
         self.user_motivations = []
         self.recommended_protocols = []
@@ -76,15 +116,6 @@ class BioAgeCoach:
         # Add system message
         self.messages.append({"role": "system", "content": SYSTEM_PROMPT})
         
-    def _load_json(self, path: str) -> Dict:
-        """Load JSON data from file."""
-        try:
-            with open(path, 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Error loading {path}: {e}")
-            return {}
-    
     def reset(self):
         """Reset the conversation state."""
         self.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -134,7 +165,7 @@ class BioAgeCoach:
             messages_with_prompt = self.messages
         
         # Get response from OpenAI using the new API format
-        response = client.chat.completions.create(
+        response = self.client.chat.completions.create(
             model="gpt-4",
             messages=messages_with_prompt,
             temperature=0.7,

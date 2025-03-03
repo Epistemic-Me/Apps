@@ -6,12 +6,58 @@ import os
 import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
+import json
 from src.chatbot.coach import BioAgeCoach
 from src.database.db_connector import DatabaseConnector, initialize_coach_with_user_data
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Ensure data directory exists
+if not os.path.exists("data"):
+    os.makedirs("data")
+
+# Default biomarkers data
+DEFAULT_BIOMARKERS = {
+    "categories": {
+        "health_data": {
+            "display_name": "Daily Health Data",
+            "items": [
+                {"id": "active_calories", "name": "Active Calories", "unit": "kcal"},
+                {"id": "steps", "name": "Steps", "unit": "steps"},
+                {"id": "sleep", "name": "Sleep Duration", "unit": "hours"},
+                {"id": "resting_heart_rate", "name": "Resting Heart Rate", "unit": "bpm"}
+            ]
+        },
+        "bio_age_tests": {
+            "display_name": "Bio-Age Tests",
+            "items": [
+                {"id": "push_ups", "name": "Push-ups", "unit": "reps"},
+                {"id": "grip_strength", "name": "Grip Strength", "unit": "kg"},
+                {"id": "one_leg_stand", "name": "One-Leg Stand", "unit": "seconds"}
+            ]
+        },
+        "biomarkers": {
+            "display_name": "Biomarkers",
+            "items": [
+                {"id": "hba1c", "name": "HbA1c", "unit": "%"},
+                {"id": "hdl", "name": "HDL Cholesterol", "unit": "mg/dL"},
+                {"id": "ldl", "name": "LDL Cholesterol", "unit": "mg/dL"}
+            ]
+        }
+    }
+}
+
+# Create biomarkers.json if it doesn't exist
+if not os.path.exists("data/biomarkers.json"):
+    with open("data/biomarkers.json", "w") as f:
+        json.dump(DEFAULT_BIOMARKERS, f, indent=2)
+
+# Create protocols.json if it doesn't exist
+if not os.path.exists("data/protocols.json"):
+    with open("data/protocols.json", "w") as f:
+        json.dump({"protocols": []}, f, indent=2)
 
 # Initialize session state
 if "coach" not in st.session_state:
@@ -21,7 +67,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "current_category" not in st.session_state:
-    st.session_state.current_category = "biomarkers"
+    st.session_state.current_category = "health_data"  # Changed default to health_data
 
 if "selected_user_id" not in st.session_state:
     st.session_state.selected_user_id = None
@@ -41,6 +87,21 @@ if "db_initialized" not in st.session_state:
     except Exception as e:
         st.session_state.db_initialized = False
         st.error(f"Error initializing database: {e}")
+
+# Initialize category options
+if "category_options" not in st.session_state:
+    st.session_state.category_options = {}
+    try:
+        for category_key, category_data in st.session_state.coach.biomarkers.get("categories", {}).items():
+            st.session_state.category_options[category_key] = category_data.get("display_name", category_key)
+    except Exception as e:
+        # Fallback to default categories if there's an error
+        st.session_state.category_options = {
+            "health_data": "Daily Health Data",
+            "bio_age_tests": "Bio-Age Tests",
+            "biomarkers": "Biomarkers"
+        }
+        st.warning("Using default categories due to missing or invalid biomarkers data.")
 
 def draw_completeness_chart(completeness_data):
     """Draw a radar chart showing data completeness across categories."""
@@ -555,7 +616,7 @@ def main():
         st.session_state.messages = []
     
     if "current_category" not in st.session_state:
-        st.session_state.current_category = "biomarkers"
+        st.session_state.current_category = "health_data"
     
     if "selected_user_id" not in st.session_state:
         st.session_state.selected_user_id = None
