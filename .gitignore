@@ -39,13 +39,14 @@ venv.bak/
 # Streamlit
 .streamlit/secrets.toml
 
-# Application specific
-data/*.db
-data/test_database.db
-*.log
-.coverage
-htmlcov/
-.pytest_cache/
+# Bioage Coach Application specific
+bio-age-coach/data/*.db
+bio-age-coach/data/test_database.db
+bio-age-coach/*.log
+bio-age-coach/.coverage
+bio-age-coach/htmlcov/
+bio-age-coach/.pytest_cache/
+bio-age-coach/.deepeval-cache.json
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -69,3 +70,5 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg 
+
+
