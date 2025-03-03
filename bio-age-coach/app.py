@@ -543,10 +543,11 @@ def show_daily_health_dashboard(user_id):
         st.error(f"Error plotting daily health data: {e}")
 
 def main():
+    """Main function to run the Bio Age Coach."""
     # Set page configuration
     st.set_page_config(page_title="Bio Age Coach", page_icon="🧬", layout="wide")
     
-    # Initialize session state
+    # Initialize all session state variables at the start
     if "coach" not in st.session_state:
         st.session_state.coach = BioAgeCoach()
     
@@ -554,19 +555,31 @@ def main():
         st.session_state.messages = []
     
     if "current_category" not in st.session_state:
-        st.session_state.current_category = "bio_age_tests"
+        st.session_state.current_category = "biomarkers"
+    
+    if "selected_user_id" not in st.session_state:
+        st.session_state.selected_user_id = None
+    
+    if "user_data_loaded" not in st.session_state:
+        st.session_state.user_data_loaded = False
+    
+    if "category_options" not in st.session_state:
+        st.session_state.category_options = {}
+        for category_key, category_data in st.session_state.coach.biomarkers.get("categories", {}).items():
+            st.session_state.category_options[category_key] = category_data.get("display_name", category_key)
     
     if "db_initialized" not in st.session_state:
         try:
             # Initialize database connector
-            st.session_state.db = DatabaseConnector()
-            st.session_state.db_initialized = True
+            db_path = "data/test_database.db"
+            if os.path.exists(db_path):
+                st.session_state.db = DatabaseConnector(db_path)
+                st.session_state.db_initialized = True
+            else:
+                st.session_state.db_initialized = False
         except Exception as e:
             st.session_state.db_initialized = False
             st.error(f"Failed to initialize database: {e}")
-    
-    if "selected_user_id" not in st.session_state:
-        st.session_state.selected_user_id = None
     
     # Main layout
     st.sidebar.title("🧬 Bio Age Coach")
@@ -582,6 +595,7 @@ def main():
                 "Select User",
                 options=list(user_options.keys()),
                 format_func=lambda x: user_options[x] if x in user_options else "Select a user",
+                key="user_selector",
                 index=0 if st.session_state.selected_user_id in user_options else None
             )
             
@@ -628,21 +642,22 @@ def main():
     if not st.session_state.db_initialized or not st.session_state.selected_user_id:
         # Category selector
         st.header("Enter Your Health Data")
-        category_options = {}
-        for category_key, category_data in st.session_state.coach.biomarkers.get("categories", {}).items():
-            category_options[category_key] = category_data.get("display_name", category_key)
         
         selected_category = st.selectbox(
             "Select data category",
-            options=list(category_options.keys()),
-            format_func=lambda x: category_options[x],
-            index=list(category_options.keys()).index(st.session_state.current_category)
+            options=list(st.session_state.category_options.keys()),
+            format_func=lambda x: st.session_state.category_options[x],
+            key="category_selector",
+            index=list(st.session_state.category_options.keys()).index(st.session_state.current_category)
         )
-        st.session_state.current_category = selected_category
+        
+        # Update current category in session state
+        if selected_category != st.session_state.current_category:
+            st.session_state.current_category = selected_category
         
         # Create a form for the selected category
-        with st.form(f"{selected_category}_form"):
-            st.subheader(f"Enter {category_options[selected_category]} Values:")
+        with st.form(key=f"{selected_category}_form"):
+            st.subheader(f"Enter {st.session_state.category_options[selected_category]} Values:")
             
             category_data = st.session_state.coach.biomarkers["categories"][selected_category]
             item_inputs = {}
@@ -657,13 +672,14 @@ def main():
                     f"{item['name']} ({item.get('unit', '')})",
                     min_value=0.0,
                     value=float(current_value) if current_value else 0.0,
-                    help=item.get("description", "")
+                    help=item.get("description", ""),
+                    key=f"input_{selected_category}_{item['id']}"
                 )
             
-            submit_button = st.form_submit_button(f"Add {category_options[selected_category]} to Chat")
+            submit_button = st.form_submit_button(f"Add {st.session_state.category_options[selected_category]} to Chat")
             
             if submit_button:
-                data_message = f"Here are my {category_options[selected_category].lower()} values:\n"
+                data_message = f"Here are my {st.session_state.category_options[selected_category].lower()} values:\n"
                 values_added = False
                 
                 for item_id, value in item_inputs.items():
@@ -679,7 +695,7 @@ def main():
                 if values_added:
                     st.session_state.messages.append({"role": "user", "content": data_message})
                 else:
-                    st.warning(f"Please enter at least one {category_options[selected_category].lower()} value")
+                    st.warning(f"Please enter at least one {st.session_state.category_options[selected_category].lower()} value")
     
     # Chat interface
     st.header("Chat with Your Biological Age Coach")
