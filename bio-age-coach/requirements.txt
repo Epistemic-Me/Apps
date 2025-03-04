@@ -1,0 +1,6 @@
+streamlit>=1.32.0
+matplotlib>=3.8.0
+numpy>=1.24.0
+python-dotenv>=1.0.0
+openai>=1.12.0
+deepeval==2.4.8 
