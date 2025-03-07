@@ -27,7 +27,9 @@ def initialize_test_data(coach: BioAgeCoach):
             "active_calories": 400,
             "steps": 8000,
             "sleep": 6.5,
-            "resting_heart_rate": 65
+            "resting_heart_rate": 65,
+            "chronological_age": 35,
+            "biological_sex": "male"
         },
         "bio_age_tests": {
             "push_ups": 30,
@@ -142,6 +144,42 @@ def create_test_cases():
             retrieval_context=["Different measurement categories can offset each other in biological age calculation",
                     "Strong physical capabilities can partially compensate for metabolic issues",
                     "Sleep duration below 7 hours can accelerate biological aging"]
+        )
+    )
+    
+    # Test case for age/sex-specific push-up assessment (male)
+    test_cases.append(
+        LLMTestCase(
+            input="Is my number of push-ups good for my age?",
+            actual_output="As a 35-year-old male, your 30 push-ups is above average. Research shows that for men in their 30s, 15-20 push-ups is average, while 25+ is considered good. Your performance of 30 push-ups suggests good upper body strength and indicates a functional age potentially lower than your chronological age. This is a positive indicator for longevity, as upper body strength correlates with reduced mortality risk in longitudinal studies.",
+            expected_output="For a 35-year-old male, 30 push-ups is above average, indicating good upper body strength and potentially a lower functional age.",
+            retrieval_context=["For men aged 30-39, 15-20 push-ups is average",
+                    "Push-up capacity correlates with mortality risk in men",
+                    "Upper body strength is a key indicator of functional age"]
+        )
+    )
+
+    # Test case for age/sex-specific push-up assessment (female)
+    test_cases.append(
+        LLMTestCase(
+            input="How are my push-ups compared to others my age?",
+            actual_output="As a 55-year-old female, your 30 push-ups is exceptional. The average range for women in their 50s is 6-10 push-ups, and your performance of 30 push-ups puts you well above the 90th percentile for your age and sex. This level of upper body strength suggests a functional age significantly lower than your chronological age. Strong performance in functional tests like push-ups is associated with better aging outcomes and reduced risk of age-related decline.",
+            expected_output="For a 55-year-old female, 30 push-ups is exceptional, placing above the 90th percentile and suggesting a lower functional age.",
+            retrieval_context=["Women aged 50-59 average 6-10 push-ups",
+                    "Push-up capacity above age norms indicates lower functional age",
+                    "Strong functional test performance correlates with better aging outcomes"]
+        )
+    )
+
+    # Test case for missing age/sex data
+    test_cases.append(
+        LLMTestCase(
+            input="Are my push-ups good?",
+            actual_output="I see you can do 30 push-ups, but I notice that your age and sex information is missing from your health profile. Push-up capacity varies significantly between males and females, and naturally declines with age. For example, what's considered 'excellent' for a 60-year-old woman would be different from what's 'good' for a 25-year-old man. Could you update your health profile with your age and sex so I can give you a more precise evaluation of your performance?",
+            expected_output="While I can see you can do 30 push-ups, I need your age and sex information from your health profile to provide an accurate assessment, as push-up capacity varies significantly by these factors.",
+            retrieval_context=["Push-up standards vary by age and sex",
+                    "Age and sex are required for accurate fitness assessment",
+                    "The user's push-up count is 30 reps"]
         )
     )
     

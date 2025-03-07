@@ -74,7 +74,7 @@ class DatabaseConnector:
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT id, username, email, created_at FROM users WHERE id = ?", 
+            "SELECT id, username, email, chronological_age, biological_sex, created_at FROM users WHERE id = ?", 
             (user_id,)
         )
         row = cursor.fetchone()
@@ -337,10 +337,14 @@ class DatabaseConnector:
         cursor = conn.cursor()
         
         try:
-            # Insert the new user
+            # Generate random age and sex for sample user
+            age = random.randint(25, 65)
+            sex = random.choice(["male", "female"])
+            
+            # Insert the new user with age and sex
             cursor.execute(
-                "INSERT INTO users (username, email) VALUES (?, ?)",
-                (user_data["username"], user_data["email"])
+                "INSERT INTO users (username, email, chronological_age, biological_sex) VALUES (?, ?, ?, ?)",
+                (user_data["username"], user_data["email"], age, sex)
             )
             user_id = cursor.lastrowid
             
@@ -458,6 +462,14 @@ class CoachDataMapper:
             "measurements": {},
             "lab_results": {}
         }
+        
+        # Map user info to health_data
+        if "user_info" in data:
+            user_info = data["user_info"]
+            if "chronological_age" in user_info:
+                coach_data["health_data"]["chronological_age"] = user_info["chronological_age"]
+            if "biological_sex" in user_info:
+                coach_data["health_data"]["biological_sex"] = user_info["biological_sex"]
         
         # Map daily health data averages
         if "daily_data" in data and "averages" in data["daily_data"]:
