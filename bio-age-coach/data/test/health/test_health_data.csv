@@ -1,0 +1,2 @@
+active_calories,steps,heart_rate,sleep_hours,demographics
+400,8000,65,7.5,"{'age': 35, 'sex': 'male'}"

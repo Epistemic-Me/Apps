@@ -42,6 +42,7 @@ venv.bak/
 # Bioage Coach Application specific
 bio-age-coach/data/*.db
 bio-age-coach/data/test_database.db
+bio-age-coach/data/test_health_data/
 bio-age-coach/*.log
 bio-age-coach/.coverage
 bio-age-coach/htmlcov/

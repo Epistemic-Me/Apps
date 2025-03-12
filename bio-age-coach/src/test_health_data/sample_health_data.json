@@ -1,0 +1,29 @@
+{
+    "user_id": "test_user_1",
+    "data_series": [
+        {
+            "date": "2024-02-08",
+            "sleep_hours": 7.5,
+            "active_calories": 750,
+            "steps": 20000,
+            "heart_rate_avg": 65,
+            "resting_heart_rate": 58
+        },
+        {
+            "date": "2024-02-09",
+            "sleep_hours": 6.8,
+            "active_calories": 450,
+            "steps": 7000,
+            "heart_rate_avg": 68,
+            "resting_heart_rate": 60
+        },
+        {
+            "date": "2024-02-10",
+            "sleep_hours": 7.2,
+            "active_calories": 600,
+            "steps": 12000,
+            "heart_rate_avg": 70,
+            "resting_heart_rate": 62
+        }
+    ]
+} 

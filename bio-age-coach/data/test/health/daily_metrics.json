@@ -1,0 +1,122 @@
+{
+  "steps": [
+    {
+      "startDate": "2025-03-08",
+      "value": 8000
+    },
+    {
+      "startDate": "2025-03-07",
+      "value": 8100
+    },
+    {
+      "startDate": "2025-03-06",
+      "value": 8200
+    },
+    {
+      "startDate": "2025-03-05",
+      "value": 8300
+    },
+    {
+      "startDate": "2025-03-04",
+      "value": 8400
+    },
+    {
+      "startDate": "2025-03-03",
+      "value": 8500
+    },
+    {
+      "startDate": "2025-03-02",
+      "value": 8600
+    }
+  ],
+  "active_calories": [
+    {
+      "startDate": "2025-03-08",
+      "value": 450
+    },
+    {
+      "startDate": "2025-03-07",
+      "value": 450
+    },
+    {
+      "startDate": "2025-03-06",
+      "value": 450
+    },
+    {
+      "startDate": "2025-03-05",
+      "value": 450
+    },
+    {
+      "startDate": "2025-03-04",
+      "value": 450
+    },
+    {
+      "startDate": "2025-03-03",
+      "value": 450
+    },
+    {
+      "startDate": "2025-03-02",
+      "value": 450
+    }
+  ],
+  "heart_rate": [
+    {
+      "startDate": "2025-03-08",
+      "value": 65
+    },
+    {
+      "startDate": "2025-03-07",
+      "value": 66
+    },
+    {
+      "startDate": "2025-03-06",
+      "value": 67
+    },
+    {
+      "startDate": "2025-03-05",
+      "value": 65
+    },
+    {
+      "startDate": "2025-03-04",
+      "value": 66
+    },
+    {
+      "startDate": "2025-03-03",
+      "value": 67
+    },
+    {
+      "startDate": "2025-03-02",
+      "value": 65
+    }
+  ],
+  "distance": [
+    {
+      "startDate": "2025-03-08",
+      "value": 5.0
+    },
+    {
+      "startDate": "2025-03-07",
+      "value": 5.1
+    },
+    {
+      "startDate": "2025-03-06",
+      "value": 5.2
+    },
+    {
+      "startDate": "2025-03-05",
+      "value": 5.3
+    },
+    {
+      "startDate": "2025-03-04",
+      "value": 5.4
+    },
+    {
+      "startDate": "2025-03-03",
+      "value": 5.5
+    },
+    {
+      "startDate": "2025-03-02",
+      "value": 5.6
+    }
+  ]
+}

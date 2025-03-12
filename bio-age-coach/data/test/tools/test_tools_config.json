@@ -1,0 +1,15 @@
+{
+  "fitness_metrics": {
+    "capabilities": {
+      "push_ups": 15,
+      "grip_strength": 90,
+      "vo2_max": 45
+    }
+  },
+  "health_metrics": {
+    "demographics": {
+      "age": 18,
+      "sex": "male"
+    }
+  }
+}
