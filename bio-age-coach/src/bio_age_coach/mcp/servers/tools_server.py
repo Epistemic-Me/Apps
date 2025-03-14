@@ -4,7 +4,7 @@ Tools server implementation for processing tool-specific requests.
 
 from typing import Dict, Any, Optional
 import aiohttp
-from .base import BaseMCPServer
+from ..core.base import BaseMCPServer
 import os
 import json
 
@@ -61,25 +61,58 @@ class ToolsServer(BaseMCPServer):
 
     async def _process_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Process incoming requests."""
-        if not await self.authenticate(request):
-            return {"error": "Authentication failed"}
-
-        request_type = request.get("type", "")
-        
-        if request_type == "get_config":
-            return {"config": await self.get_config()}
-        elif request_type == "query":
-            tool_name = request.get("tool_name", "")
-            if not tool_name:
-                return {"error": "tool_name is required"}
-            if tool_name not in ["biological_age", "health_score", "fitness_metrics", "analyze"]:
-                return {"error": f"Unknown tool: {tool_name}"}
-            return {"result": await self.process_query(request)}
-        else:
-            return {"error": f"Unknown request type: {request_type}"}
+        try:
+            request_type = request.get("type", "")
+            
+            # Handle get_config request
+            if request_type == "get_config":
+                return await self.get_config()
+            
+            # Handle query request
+            elif request_type == "query":
+                tool_name = request.get("tool_name", "")
+                data = request.get("data", {})
+                
+                if not tool_name:
+                    return {"error": "No tool name provided"}
+                
+                if tool_name == "biological_age":
+                    metrics = data.get("metrics", {})
+                    return await self._calculate_biological_age(metrics)
+                elif tool_name == "health_score":
+                    metrics = data.get("metrics", {})
+                    return await self._calculate_health_score(metrics)
+                elif tool_name == "fitness_metrics":
+                    return await self._get_fitness_metrics()
+                elif tool_name == "analyze":
+                    return await self._analyze_data(data)
+                else:
+                    return {"error": f"Unknown tool: {tool_name}"}
+            
+            # Handle direct tool requests
+            elif request_type == "biological_age":
+                metrics = request.get("metrics", {})
+                return await self._calculate_biological_age(metrics)
+            elif request_type == "health_score":
+                metrics = request.get("metrics", {})
+                return await self._calculate_health_score(metrics)
+            elif request_type == "fitness_metrics":
+                return await self._get_fitness_metrics()
+            elif request_type == "analyze":
+                data = request.get("data", {})
+                return await self._analyze_data(data)
+            else:
+                return {"error": f"Unknown request type: {request_type}"}
+                
+        except Exception as e:
+            print(f"Error processing request: {str(e)}")
+            return {"error": f"Error processing request: {str(e)}"}
 
     async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Handle incoming requests."""
+        # Check authentication first
+        if not await self.authenticate(request):
+            return {"error": "Authentication failed"}
         return await self._process_request(request)
 
     async def get_config(self) -> Dict[str, Any]:
@@ -102,48 +135,47 @@ class ToolsServer(BaseMCPServer):
         else:
             return {"error": f"Unknown tool: {tool_name}"}
 
-    async def _calculate_biological_age(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    async def _calculate_biological_age(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate biological age based on health metrics."""
-        # Validate inputs
-        age = data.get("chronological_age", 35)
-        heart_rate = data.get("resting_heart_rate", 70)
-        active_calories = data.get("active_calories", 300)
-        steps = data.get("steps", 7000)
-        sleep = data.get("sleep_hours", 7)
-
-        # Simple calculation (this is just a placeholder)
-        bio_age = age
-        if heart_rate < 60:
-            bio_age -= 2
-        elif heart_rate > 80:
-            bio_age += 2
-
-        if active_calories > 400:
-            bio_age -= 1
-        elif active_calories < 200:
-            bio_age += 1
-
-        if steps > 10000:
-            bio_age -= 1
-        elif steps < 5000:
-            bio_age += 1
-
-        if sleep >= 7 and sleep <= 9:
-            bio_age -= 1
-        else:
-            bio_age += 1
-
-        return {
-            "tool_name": "biological_age",
-            "chronological_age": age,
-            "biological_age": bio_age,
-            "factors": {
-                "heart_rate": heart_rate,
-                "active_calories": active_calories,
-                "steps": steps,
-                "sleep": sleep
+        try:
+            # Extract metrics
+            sleep_hours = metrics.get("sleep_hours", 0)
+            active_calories = metrics.get("active_calories", 0)
+            steps = metrics.get("steps", 0)
+            
+            # Simple calculation (placeholder)
+            biological_age = 35  # Base age
+            
+            # Sleep impact
+            if sleep_hours >= 7 and sleep_hours <= 9:
+                biological_age -= 2
+            elif sleep_hours < 6 or sleep_hours > 10:
+                biological_age += 2
+            
+            # Activity impact
+            if active_calories >= 400:
+                biological_age -= 2
+            elif active_calories < 200:
+                biological_age += 2
+            
+            # Steps impact
+            if steps >= 10000:
+                biological_age -= 1
+            elif steps < 5000:
+                biological_age += 1
+            
+            return {
+                "biological_age": biological_age,
+                "factors": {
+                    "sleep_hours": sleep_hours,
+                    "active_calories": active_calories,
+                    "steps": steps
+                }
             }
-        }
+            
+        except Exception as e:
+            print(f"Error calculating biological age: {str(e)}")
+            return {"error": f"Error calculating biological age: {str(e)}"}
 
     async def _calculate_health_score(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate health score based on available metrics."""

@@ -7,8 +7,8 @@ import json
 import os
 import pandas as pd
 from datetime import datetime, timedelta
-from bio_age_coach.mcp.bio_age_score_server import BioAgeScoreServer
-from bio_age_coach.mcp.health_server import HealthServer
+from bio_age_coach.mcp.servers.bio_age_score_server import BioAgeScoreServer
+from bio_age_coach.mcp.servers.health_server import HealthServer
 from bio_age_coach.types import DataCategory
 
 def process_workout_data(data_dir: str) -> list:
@@ -17,9 +17,13 @@ def process_workout_data(data_dir: str) -> list:
     workout_file = os.path.join(data_dir, "Workouts-20250205_000000-20250307_235959.csv")
     df = pd.read_csv(workout_file)
     
-    # Convert Start column to datetime
+    # Convert Start and End columns to datetime
     df['Start'] = pd.to_datetime(df['Start'])
+    df['End'] = pd.to_datetime(df['End'])
     df['Date'] = df['Start'].dt.date
+    
+    # Calculate duration in seconds
+    df['Duration'] = (df['End'] - df['Start']).dt.total_seconds()
     
     # Group by date and calculate daily metrics
     daily_metrics = []
@@ -31,9 +35,7 @@ def process_workout_data(data_dir: str) -> list:
         steps = group['Step Count'].sum()
         
         # Calculate average heart rate (weighted by workout duration)
-        durations = pd.to_timedelta(group['Duration'])
-        total_duration = durations.sum().total_seconds()
-        weighted_hr = ((group['Avg. Heart Rate (bpm)'] * durations.dt.total_seconds()).sum() / total_duration) if total_duration > 0 else 0
+        weighted_hr = ((group['Avg. Heart Rate (bpm)'] * group['Duration']).sum() / group['Duration'].sum()) if not group['Duration'].empty else 0
         
         # Create daily metrics entry
         metrics = {

@@ -1,17 +1,23 @@
 """
-MCP (Multi-Component Protocol) package for managing health data and protocols.
+Multi-Conversation Protocol (MCP) package for Bio Age Coach.
 """
 
-from .client import MultiServerMCPClient
-from .health_server import HealthServer
-from .research_server import ResearchServer
-from .tools_server import ToolsServer
-from .router import QueryRouter
+from .utils.client import MultiServerMCPClient
+from .servers.health_server import HealthServer
+from .servers.research_server import ResearchServer
+from .servers.tools_server import ToolsServer
+from .core.router import QueryRouter
+from .core.module_registry import ModuleRegistry
+from .core.convo_module import ConvoModule
+from .modules.bio_age_score_module import BioAgeScoreModule
 
 __all__ = [
     'MultiServerMCPClient',
     'HealthServer',
     'ResearchServer',
     'ToolsServer',
-    'QueryRouter'
+    'QueryRouter',
+    'ModuleRegistry',
+    'ConvoModule',
+    'BioAgeScoreModule',
 ] 

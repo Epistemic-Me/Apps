@@ -1,6 +1,6 @@
 """Base MCP server implementation."""
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import asyncio
 import logging
 from abc import ABC, abstractmethod
@@ -16,6 +16,11 @@ class BaseMCPServer(ABC):
         """
         self.api_key = api_key
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.config = {}
+        self.config_file = None
+        self.resources = {}
+        self.resource_templates = {}
+        self.tools = {}
         
     async def authenticate(self, request: Dict[str, Any]) -> bool:
         """Authenticate an incoming request.
@@ -26,7 +31,12 @@ class BaseMCPServer(ABC):
         Returns:
             bool: True if authentication succeeds, False otherwise
         """
-        return request.get("api_key") == self.api_key
+        api_key = request.get("api_key")
+        return api_key == self.api_key
+        
+    async def process_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Process incoming requests. Public interface that calls _process_request."""
+        return await self._process_request(request)
         
     async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Handle an incoming request.
@@ -65,8 +75,8 @@ class BaseMCPServer(ABC):
         raise NotImplementedError
         
     async def initialize_data(self, data: Dict[str, Any]) -> None:
-        """Initialize server with data. Must be implemented by subclasses."""
-        raise NotImplementedError
+        """Initialize server with data. Should be overridden by subclasses if needed."""
+        pass
         
     async def close(self) -> None:
         """Close any open connections."""

@@ -1,16 +1,23 @@
 """
-Core implementation of the BioAgeCoach chatbot.
+Bio Age Coach chatbot implementation.
 """
 
-import json
 import os
+import json
+import logging
 import asyncio
 import time
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Any, List, Optional, Tuple
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
+
 from bio_age_coach.chatbot.prompts import (
     SYSTEM_PROMPT,
+    USER_PROMPT_TEMPLATE,
+    ASSISTANT_PROMPT_TEMPLATE,
     BIOMARKER_ASSESSMENT_PROMPT,
     PROTOCOL_RECOMMENDATION_PROMPT,
     MOTIVATION_EXPLORATION_PROMPT,
@@ -23,8 +30,10 @@ from bio_age_coach.chatbot.prompts import (
     REFINEMENT_DATA_PROMPT,
     COMPREHENSIVE_ANALYSIS_PROMPT
 )
-from bio_age_coach.mcp.client import MultiServerMCPClient
-from bio_age_coach.mcp.router import QueryRouter
+
+from bio_age_coach.mcp.utils.client import MultiServerMCPClient
+from bio_age_coach.mcp.core.router import QueryRouter
+from test_bio_age_score_server import process_workout_data  # Updated import path
 
 # Load environment variables
 load_dotenv()
@@ -139,7 +148,6 @@ class BioAgeCoach:
             # Load test health data
             data_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data', 'test_health_data')
             if os.path.exists(data_dir):
-                from ..mcp.test_bio_age_score_server import process_workout_data
                 daily_metrics = process_workout_data(data_dir)
                 if daily_metrics:
                     self.user_data["health_data"] = daily_metrics
@@ -150,8 +158,9 @@ class BioAgeCoach:
                 print(f"Test data directory not found: {data_dir}")
             
             # Initialize servers with test data
-            await self.mcp_client.health_server.initialize_data({"health_data": self.user_data["health_data"]})
-            await self.mcp_client.bio_age_score_server.initialize_data({"health_data": self.user_data["health_data"]})
+            if self.user_data["health_data"]:
+                await self.mcp_client.health_server.initialize_data({"health_data": self.user_data["health_data"]})
+                await self.mcp_client.bio_age_score_server.initialize_data({"health_data": self.user_data["health_data"]})
             
             return self
             
@@ -195,11 +204,63 @@ class BioAgeCoach:
             self.conversation_history.append({"role": "user", "content": message})
             
             # Route the query to appropriate server
-            response = await self.query_router.route_query(message)
-            server_type = response.get("server", "bio_age_score")  # Default to bio_age_score for visualization
-            request_type = response.get("type", "query")
+            response = await self.query_router.route_query(
+                user_id="test_user_1",  # Using test user for now
+                query=message,
+                metadata={"conversation_history": self.conversation_history}
+            )
             
-            # Handle bio-age score request
+            # If we got a direct text response, return it
+            if isinstance(response, dict) and "response" in response:
+                return response["response"]
+            
+            # Handle metrics response
+            if isinstance(response, dict) and "metrics" in response:
+                # Format response with metrics and insights
+                response_text = "Here's your health data analysis:\n\n"
+                
+                # Add metrics summary
+                metrics = response.get("metrics", {})
+                if metrics:
+                    response_text += "Current Metrics:\n"
+                    for key, value in metrics.items():
+                        if isinstance(value, (int, float)):
+                            response_text += f"- {key}: {value}\n"
+                        elif isinstance(value, dict):
+                            response_text += f"- {key}:\n"
+                            for subkey, subvalue in value.items():
+                                response_text += f"  - {subkey}: {subvalue}\n"
+                
+                # Add insights if available
+                insights = response.get("insights", [])
+                if insights:
+                    response_text += "\nKey Insights:\n"
+                    for insight in insights:
+                        response_text += f"- {insight}\n"
+                
+                # Add visualization if available
+                if "visualization" in response:
+                    response_text += "\nI've created a visualization of your data for better understanding."
+                
+                # If no metrics were found, provide a more helpful message
+                if not metrics and not insights:
+                    response_text = "I see you're asking about your health metrics. Let me analyze your data to provide you with a detailed breakdown of your current health status and trends."
+                    
+                    # Try to get metrics from user data
+                    if self.user_data.get("health_data"):
+                        health_data = self.user_data["health_data"]
+                        if isinstance(health_data, list) and len(health_data) > 0:
+                            latest_data = health_data[-1]
+                            response_text += "\n\nYour Latest Health Data:\n"
+                            for key, value in latest_data.items():
+                                if isinstance(value, (int, float)):
+                                    response_text += f"- {key}: {value}\n"
+                    
+                    response_text += "\nWould you like me to analyze any specific aspects of your health data in more detail?"
+                
+                return response_text
+            
+            # Handle bio-age score request with visualization
             if "bio" in message.lower() and "score" in message.lower():
                 if not self.user_data.get("health_data"):
                     return "I don't have any health data to calculate your bio-age score. Please upload your health data first."
@@ -224,39 +285,12 @@ class BioAgeCoach:
                         for insight in insights:
                             response_text += f"- {insight}\n"
                     
-                    return {
-                        "visualization": viz_data,
-                        "insights": insights,
-                        "text": response_text
-                    }
+                    return response_text
                 else:
                     return "I encountered an error while calculating your bio-age score. Please try again."
             
-            # Handle other requests
-            server_response = await self.mcp_client.send_request(
-                server_type,
-                {
-                    "type": request_type,
-                    "query": message,
-                    "data": {"health_data": self.user_data.get("health_data", [])}
-                }
-            )
-            
-            # Update user data with any new health data, habits, or plans
-            if isinstance(server_response, dict):
-                if "health_data" in server_response:
-                    self.user_data["health_data"] = server_response["health_data"]
-                if "habits" in server_response:
-                    self.user_habits = server_response["habits"]
-                if "plan" in server_response:
-                    self.recommended_protocols = server_response["plan"]
-                
-                # Return visualization if present
-                if "visualization" in server_response:
-                    return server_response
-                
-                # Return text response
-                return server_response.get("response", "I processed your request but don't have a specific response to show.")
+            # If we got here without a response, return a default message
+            return "I'm not sure how to help with that. Could you try rephrasing your question?"
             
         except Exception as e:
             error_msg = f"Error processing message: {str(e)}"
