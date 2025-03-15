@@ -31,9 +31,9 @@ from bio_age_coach.chatbot.prompts import (
     COMPREHENSIVE_ANALYSIS_PROMPT
 )
 
-from bio_age_coach.mcp.utils.client import MultiServerMCPClient
-from bio_age_coach.mcp.core.router import QueryRouter
-from test_bio_age_score_server import process_workout_data  # Updated import path
+from bio_age_coach.mcp.client import MultiServerMCPClient
+from bio_age_coach.router.router_adapter import RouterAdapter
+from bio_age_coach.mcp.core.module_registry import ModuleRegistry
 
 # Load environment variables
 load_dotenv()
@@ -50,322 +50,177 @@ class BioAgeCoach:
     This class manages the conversation flow and state for the Bio Age Coach chatbot.
     """
     
-    def __init__(self, mcp_client: MultiServerMCPClient, query_router: QueryRouter, test_mode: bool = False):
-        """Initialize the Bio Age Coach with MCP client and query router."""
+    def __init__(self, mcp_client: MultiServerMCPClient, router_adapter: RouterAdapter):
+        """Initialize the Bio Age Coach.
+        
+        Args:
+            mcp_client: MCP client for server communication
+            router_adapter: Router adapter for directing queries
+        """
         self.mcp_client = mcp_client
-        self.query_router = query_router
-        self.conversation_history: List[Dict[str, str]] = []
-        self.current_stage = "initial"
-        self.test_mode = test_mode
-        self.openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.router_adapter = router_adapter
+        self.context: Dict[str, Any] = {}
+        self.user_id = "default_user"
         
-        # Rate limiting settings
-        self.last_api_call = 0
-        self.min_delay_between_calls = 5  # 5 seconds between API calls
-        
-        # Test responses for evaluation
-        self.test_responses = {
-            "What is my current fitness level based on my push-ups?": 
-                "Based on your push-up count of 30, your upper body strength is excellent for your age group. This indicates strong muscular endurance.",
-            "How does my grip strength compare to others my age?":
-                "Your grip strength of 90kg is excellent for your age group, placing you well above average. This indicates exceptional overall strength.",
-            "What do my blood sugar levels indicate about my biological age?":
-                "Your HbA1c of 5.9% indicates pre-diabetic range, which can accelerate biological aging. This suggests opportunity for metabolic health improvement.",
-            "How can I improve my biological age markers?":
-                "Based on your metrics, focus on: 1) Improving blood sugar control through diet and exercise, 2) Maintaining your excellent strength levels, 3) Optimizing sleep duration which is currently below recommended levels.",
-            "What lifestyle changes would have the biggest impact on my biological age?":
-                "Based on your current metrics, prioritize: 1) Increasing sleep from 6.5 to 7-9 hours per night, 2) Improving blood sugar control through diet modifications, 3) Maintaining your excellent fitness levels."
-        }
-        
-        # Initialize empty user data structure
-        self.user_data = {
-            "health_data": [],
-            "habits": {},
-            "plan": {},
-            "bio_age_tests": {},
-            "capabilities": {},
-            "biomarkers": {},
-            "measurements": {},
-            "lab_results": {},
-            "age": None,
-            "sex": None
-        }
-        
-        # Load protocols data
-        try:
-            with open("data/protocols.json", "r") as f:
-                self.protocols = json.load(f)
-        except Exception as e:
-            print(f"Error loading data/protocols.json: {e}")
-            self.protocols = {"protocols": []}
-        
-        # Initialize conversation state
-        self.user_habits = []
-        self.user_motivations = []
-        self.recommended_protocols = []
-        
-        # Category weights for overall completeness calculation
-        self.category_weights = {
-            "health_data": 0.15,
-            "bio_age_tests": 0.15,
-            "capabilities": 0.10,
-            "biomarkers": 0.25,
-            "measurements": 0.15,
-            "lab_results": 0.20
-        }
-        
-        # Add system message
-        self.conversation_history.append({"role": "system", "content": SYSTEM_PROMPT})
-        
-    async def initialize(self) -> 'BioAgeCoach':
-        """Initialize the coach with data from MCP servers."""
-        await self._load_initial_data()
-        return self
-
     @classmethod
-    async def create(cls, mcp_client: MultiServerMCPClient, query_router: QueryRouter) -> 'BioAgeCoach':
-        """Factory method to create and initialize a coach."""
-        coach = cls(mcp_client, query_router)
-        return await coach.initialize()
+    async def create(cls, mcp_client: MultiServerMCPClient, router_adapter: RouterAdapter) -> 'BioAgeCoach':
+        """Create a new Bio Age Coach instance.
         
-    async def _load_initial_data(self):
-        """Load initial test data for the coach."""
+        Args:
+            mcp_client: MCP client for server communication
+            router_adapter: Router adapter for directing queries
+            
+        Returns:
+            BioAgeCoach instance
+        """
+        return cls(mcp_client, router_adapter)
+        
+    async def process_message(self, message: str) -> Dict[str, Any]:
+        """Process a user message.
+        
+        Args:
+            message: User message
+            
+        Returns:
+            Response from the appropriate agent
+        """
         try:
-            # Initialize empty user data structure
-            self.user_data = {
-                "health_data": [],
-                "habits": {},
-                "plan": {},
-                "bio_age_tests": {},
-                "capabilities": {},
-                "biomarkers": {},
-                "measurements": {},
-                "lab_results": {},
-                "age": None,
-                "sex": None
-            }
+            response = await self.router_adapter.route_query(
+                user_id=self.user_id,
+                query=message
+            )
             
-            # Load test health data
-            data_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'data', 'test_health_data')
-            if os.path.exists(data_dir):
-                daily_metrics = process_workout_data(data_dir)
-                if daily_metrics:
-                    self.user_data["health_data"] = daily_metrics
-                    print(f"Loaded {len(daily_metrics)} days of health data")
-                else:
-                    print("No health data processed from test files")
-            else:
-                print(f"Test data directory not found: {data_dir}")
-            
-            # Initialize servers with test data
-            if self.user_data["health_data"]:
-                await self.mcp_client.health_server.initialize_data({"health_data": self.user_data["health_data"]})
-                await self.mcp_client.bio_age_score_server.initialize_data({"health_data": self.user_data["health_data"]})
-            
-            return self
-            
+            # Handle None response
+            if response is None:
+                response = {
+                    "response": "I processed your message but couldn't generate a specific response. Please try rephrasing your question.",
+                    "insights": [],
+                    "visualization": None
+                }
+                
+            # Update the active context
+            self.get_active_context()
+                
+            return response
         except Exception as e:
-            print(f"Error loading initial data: {str(e)}")
-            return self
+            return {
+                "response": "I encountered an error processing your message.",
+                "insights": [],
+                "visualization": None,
+                "error": str(e)
+            }
+
+    def get_active_context(self) -> Dict[str, Any]:
+        """Get the current active context from the router.
+        
+        Returns:
+            Dict containing the active topic and observation contexts
+        """
+        active_topic = self.router_adapter.semantic_router.get_active_topic(self.user_id)
+        
+        # Get observation contexts if available
+        observation_contexts = {}
+        if hasattr(self.router_adapter.semantic_router, 'observation_contexts'):
+            user_contexts = self.router_adapter.semantic_router.observation_contexts.get(self.user_id, {})
+            for agent_name, context in user_contexts.items():
+                if hasattr(context, 'data_type'):
+                    # Extract all relevant information from the context
+                    context_data = {
+                        'data_type': context.data_type,
+                        'relevancy_score': context.relevancy_score,
+                        'confidence_score': context.confidence_score
+                    }
+                    
+                    # Add additional information if available
+                    if hasattr(context, 'timestamp'):
+                        context_data['timestamp'] = str(context.timestamp)
+                    
+                    observation_contexts[agent_name] = context_data
+        
+        # Log the contexts for debugging
+        print(f"Active topic: {active_topic}")
+        print(f"Observation contexts: {observation_contexts}")
+        
+        return {
+            'active_topic': active_topic,
+            'observation_contexts': observation_contexts
+        }
     
     def reset(self):
         """Reset the conversation state."""
-        self.conversation_history = [{"role": "system", "content": SYSTEM_PROMPT}]
-        self.user_data = {
-            "health_data": [],
-            "habits": {},
-            "plan": {},
-            "bio_age_tests": {},
-            "capabilities": {},
-            "biomarkers": {},
-            "measurements": {},
-            "lab_results": {},
-            "age": None,
-            "sex": None
-        }
-        self.user_habits = []
-        self.user_motivations = []
-        self.recommended_protocols = []
-        self.current_stage = "initial"
-    
-    async def _wait_for_rate_limit(self):
-        """Wait for rate limit to reset."""
-        current_time = time.time()
-        time_since_last_call = current_time - self.last_api_call
-        if time_since_last_call < self.min_delay_between_calls:
-            delay = self.min_delay_between_calls - time_since_last_call
-            await asyncio.sleep(delay)
-        self.last_api_call = time.time()
-    
-    async def process_message(self, message: str) -> str:
-        """Process a user message and return a response."""
-        try:
-            # Add user message to conversation history
-            self.conversation_history.append({"role": "user", "content": message})
-            
-            # Route the query to appropriate server
-            response = await self.query_router.route_query(
-                user_id="test_user_1",  # Using test user for now
-                query=message,
-                metadata={"conversation_history": self.conversation_history}
-            )
-            
-            # If we got a direct text response, return it
-            if isinstance(response, dict) and "response" in response:
-                return response["response"]
-            
-            # Handle metrics response
-            if isinstance(response, dict) and "metrics" in response:
-                # Format response with metrics and insights
-                response_text = "Here's your health data analysis:\n\n"
-                
-                # Add metrics summary
-                metrics = response.get("metrics", {})
-                if metrics:
-                    response_text += "Current Metrics:\n"
-                    for key, value in metrics.items():
-                        if isinstance(value, (int, float)):
-                            response_text += f"- {key}: {value}\n"
-                        elif isinstance(value, dict):
-                            response_text += f"- {key}:\n"
-                            for subkey, subvalue in value.items():
-                                response_text += f"  - {subkey}: {subvalue}\n"
-                
-                # Add insights if available
-                insights = response.get("insights", [])
-                if insights:
-                    response_text += "\nKey Insights:\n"
-                    for insight in insights:
-                        response_text += f"- {insight}\n"
-                
-                # Add visualization if available
-                if "visualization" in response:
-                    response_text += "\nI've created a visualization of your data for better understanding."
-                
-                # If no metrics were found, provide a more helpful message
-                if not metrics and not insights:
-                    response_text = "I see you're asking about your health metrics. Let me analyze your data to provide you with a detailed breakdown of your current health status and trends."
-                    
-                    # Try to get metrics from user data
-                    if self.user_data.get("health_data"):
-                        health_data = self.user_data["health_data"]
-                        if isinstance(health_data, list) and len(health_data) > 0:
-                            latest_data = health_data[-1]
-                            response_text += "\n\nYour Latest Health Data:\n"
-                            for key, value in latest_data.items():
-                                if isinstance(value, (int, float)):
-                                    response_text += f"- {key}: {value}\n"
-                    
-                    response_text += "\nWould you like me to analyze any specific aspects of your health data in more detail?"
-                
-                return response_text
-            
-            # Handle bio-age score request with visualization
-            if "bio" in message.lower() and "score" in message.lower():
-                if not self.user_data.get("health_data"):
-                    return "I don't have any health data to calculate your bio-age score. Please upload your health data first."
-                
-                # Calculate scores and get visualization
-                viz_response = await self.mcp_client.send_request(
-                    "bio_age_score",
-                    {
-                        "type": "visualization",
-                        "data": {"health_data": self.user_data["health_data"]}
-                    }
-                )
-                
-                if isinstance(viz_response, dict) and "visualization" in viz_response:
-                    viz_data = viz_response["visualization"]
-                    insights = viz_response.get("insights", [])
-                    
-                    # Format response with visualization and insights
-                    response_text = "Here's your bio-age score analysis:\n\n"
-                    if insights:
-                        response_text += "Key Insights:\n"
-                        for insight in insights:
-                            response_text += f"- {insight}\n"
-                    
-                    return response_text
-                else:
-                    return "I encountered an error while calculating your bio-age score. Please try again."
-            
-            # If we got here without a response, return a default message
-            return "I'm not sure how to help with that. Could you try rephrasing your question?"
-            
-        except Exception as e:
-            error_msg = f"Error processing message: {str(e)}"
-            print(error_msg)
-            return "I apologize, but I encountered an error processing your request. Please try again."
-            
-    async def _generate_response(self, message: str, insights: List[str]) -> str:
-        """Generate a response using OpenAI."""
-        # Construct user data context
-        data_instruction = """
-        You are a Bio Age Coach providing data-driven responses about the user's health metrics.
-        
-        Key guidelines:
-        1. Always reference specific metrics and values from the user's data
-        2. Compare metrics to standard reference ranges
-        3. Provide evidence-based recommendations
-        4. Structure responses with clear sections:
-           - Current Status: Specific metrics and their interpretation
-           - Impact Analysis: How metrics affect biological age
-           - Recommendations: Actionable steps for improvement
-           - Evidence Base: Reference to scientific guidelines or studies
-        5. Use bullet points and clear formatting for readability
-        6. Include specific numbers and ranges when available
-        7. Provide context for why each recommendation matters
-        
-        Available insights:
-        {insights}
-        
-        User message: {message}
-        
-        Previous conversation:
-        {conversation}
-        """
-        
-        # Format insights and conversation history
-        insights_text = "\n".join([f"- {insight}" for insight in insights])
-        conversation_text = "\n".join([
-            f"{msg['role']}: {msg['content']}"
-            for msg in self.conversation_history[-3:]  # Last 3 messages for context
-        ])
-        
-        # Prepare the messages for the API call
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": data_instruction.format(
-                insights=insights_text,
-                message=message,
-                conversation=conversation_text
-            )}
-        ]
-        
-        try:
-            # Make API call with retries
-            max_retries = 3
-            for attempt in range(max_retries):
-                try:
-                    completion = await self.openai_client.chat.completions.create(
-                        model=MODEL_NAME,
-                        messages=messages,
-                        temperature=0.7,
-                        max_tokens=800
-                    )
-                    return completion.choices[0].message.content
-                except Exception as e:
-                    if attempt == max_retries - 1:
-                        raise e
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
-            
-        except Exception as e:
-            print(f"Error in _generate_response: {str(e)}")
-            return "I apologize, but I encountered an error analyzing your health data. Please try again."
+        self.context = {}
+        self.router_adapter.clear_context(self.user_id)
     
     def update_user_data(self, data: Dict[str, Any]) -> None:
         """Update user data with new information."""
-        self.user_data.update(data)
+        self.context.update(data)
+        self.router_adapter.update_context(self.user_id, data)
+        
+    async def handle_data_upload(self, data_type: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle data upload.
+        
+        Args:
+            data_type: Type of data being uploaded
+            data: Data being uploaded
+            
+        Returns:
+            Response from processing the data
+        """
+        try:
+            print(f"Processing {data_type} data upload...")
+            print(f"Data keys: {list(data.keys())}")
+            
+            # Create a prompt about the uploaded data
+            data_prompt = f"I've just uploaded my {data_type} data. Can you analyze it and give me insights?"
+            
+            # Create metadata with data_upload flag
+            metadata = {
+                "data_upload": True,
+                "data_type": data_type,
+                "data": data
+            }
+            
+            # Route the query with the data upload metadata
+            print(f"Routing query with data_type={data_type}")
+            response = await self.router_adapter.route_query(
+                user_id=self.user_id,
+                query=data_prompt,
+                metadata=metadata
+            )
+            
+            # Log the response for debugging
+            print(f"Router response type: {type(response)}")
+            if response is None:
+                print("Received None response from router")
+            else:
+                print(f"Response keys: {list(response.keys()) if isinstance(response, dict) else 'Not a dict'}")
+            
+            # Handle None response
+            if response is None:
+                print("Creating default response for None")
+                # Create a default response
+                response = {
+                    "response": f"I've processed your {data_type} data and created an observation context. You can now ask me questions about your {data_type} data.",
+                    "insights": [f"Successfully processed {data_type} data"],
+                    "visualization": None
+                }
+            
+            # Force update of the active context
+            print("Updating active context after data upload")
+            active_context = self.get_active_context()
+            print(f"Updated context: {active_context}")
+            
+            return response
+        except Exception as e:
+            print(f"Error in handle_data_upload: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "response": f"I encountered an error processing your {data_type} data upload: {str(e)}",
+                "insights": [],
+                "visualization": None,
+                "error": str(e)
+            }
     
     def set_stage(self, stage: str) -> None:
         """Set the current conversation stage."""
@@ -402,7 +257,7 @@ class BioAgeCoach:
             next_prompt = self._get_stage_prompt()
         
         # Create system prompt with current user data
-        system_prompt = SYSTEM_PROMPT + "\n\nCurrent user data:\n" + json.dumps(self.user_data, indent=2)
+        system_prompt = SYSTEM_PROMPT + "\n\nCurrent user data:\n" + json.dumps(self.context, indent=2)
         
         # Update system message with current data
         self.conversation_history[0] = {"role": "system", "content": system_prompt}
@@ -456,7 +311,7 @@ class BioAgeCoach:
         
         # Update conversation stage based on content and current stage
         if self.current_stage == "initial":
-            if len(self.user_data["biomarkers"]) > 0 or len(self.user_data["health_data"]) > 0:
+            if len(self.context["biomarkers"]) > 0 or len(self.context["health_data"]) > 0:
                 self.current_stage = "assessment"
             elif len(self.user_habits) > 0:
                 self.current_stage = "habits"
@@ -491,7 +346,7 @@ class BioAgeCoach:
                                 # Find which category this biomarker belongs to
                                 category, item_id = self._find_biomarker_category(name)
                                 if category and item_id:
-                                    self.user_data[category][item_id] = value
+                                    self.context[category][item_id] = value
                             except ValueError:
                                 # Not a numeric value, skip
                                 pass
@@ -543,9 +398,9 @@ class BioAgeCoach:
             True if there is enough data, False otherwise
         """
         # Either need good biomarker coverage or good functional test coverage
-        biomarker_count = len(self.user_data["biomarkers"])
-        bio_age_tests_count = len(self.user_data["bio_age_tests"])
-        lab_results_count = len(self.user_data["lab_results"])
+        biomarker_count = len(self.context["biomarkers"])
+        bio_age_tests_count = len(self.context["bio_age_tests"])
+        lab_results_count = len(self.context["lab_results"])
         
         return (biomarker_count >= 3) or (bio_age_tests_count >= 2) or (lab_results_count >= 1)
     
@@ -580,7 +435,7 @@ class BioAgeCoach:
         if total_items == 0:
             return 0.0
         
-        collected_items = len(self.user_data[category])
+        collected_items = len(self.context[category])
         return min(collected_items / total_items, 1.0)
     
     def calculate_overall_completeness(self) -> float:
@@ -630,7 +485,7 @@ class BioAgeCoach:
         # For each category
         for category_key, category_data in self.protocols.get("protocols", {}).items():
             category_display_name = category_data.get("display_name", category_key)
-            user_category_data = self.user_data.get(category_key, {})
+            user_category_data = self.context.get(category_key, {})
             
             # Skip empty categories
             if not user_category_data:
@@ -684,11 +539,11 @@ class BioAgeCoach:
         assessment_parts = []
         
         # Check health data
-        if self.user_data.get("health_data", {}):
+        if self.context.get("health_data", {}):
             health_assessment = "Your activity metrics indicate "
-            active_calories = self.user_data["health_data"].get("active_calories", 0)
-            steps = self.user_data["health_data"].get("steps", 0)
-            sleep = self.user_data["health_data"].get("sleep", 0)
+            active_calories = self.context["health_data"].get("active_calories", 0)
+            steps = self.context["health_data"].get("steps", 0)
+            sleep = self.context["health_data"].get("sleep", 0)
             
             if active_calories > 500 and steps > 8000:
                 health_assessment += "an active lifestyle, which is associated with lower biological age. "
@@ -707,12 +562,12 @@ class BioAgeCoach:
             assessment_parts.append(health_assessment)
         
         # Check biomarkers
-        if self.user_data.get("biomarkers", {}):
+        if self.context.get("biomarkers", {}):
             bio_assessment = "Your biomarker profile shows "
             
-            hba1c = self.user_data["biomarkers"].get("hba1c", 0)
-            fasting_glucose = self.user_data["biomarkers"].get("fasting_glucose", 0)
-            crp = self.user_data["biomarkers"].get("crp", 0)
+            hba1c = self.context["biomarkers"].get("hba1c", 0)
+            fasting_glucose = self.context["biomarkers"].get("fasting_glucose", 0)
+            crp = self.context["biomarkers"].get("crp", 0)
             
             issues = []
             if hba1c > 5.7:
@@ -730,11 +585,11 @@ class BioAgeCoach:
             assessment_parts.append(bio_assessment)
         
         # Check physical measurements
-        if self.user_data.get("measurements", {}):
+        if self.context.get("measurements", {}):
             meas_assessment = "Your physical measurements indicate "
             
-            body_fat = self.user_data["measurements"].get("body_fat", 0)
-            waist_to_height = self.user_data["measurements"].get("waist_to_height", 0)
+            body_fat = self.context["measurements"].get("body_fat", 0)
+            waist_to_height = self.context["measurements"].get("waist_to_height", 0)
             
             if body_fat > 25 or waist_to_height > 0.5:
                 meas_assessment += "elevated body fat levels, which can contribute to metabolic aging."
@@ -744,13 +599,13 @@ class BioAgeCoach:
             assessment_parts.append(meas_assessment)
         
         # Check functional tests
-        if self.user_data.get("bio_age_tests", {}) or self.user_data.get("capabilities", {}):
+        if self.context.get("bio_age_tests", {}) or self.context.get("capabilities", {}):
             func_assessment = "Your functional assessments suggest "
             
             # Combine bio_age_tests and capabilities
             func_values = {}
-            func_values.update(self.user_data.get("bio_age_tests", {}))
-            func_values.update(self.user_data.get("capabilities", {}))
+            func_values.update(self.context.get("bio_age_tests", {}))
+            func_values.update(self.context.get("capabilities", {}))
             
             # Count how many are above/below average
             above_avg = 0
@@ -881,7 +736,7 @@ class BioAgeCoach:
                 break
                 
             category_data = self.protocols["protocols"][category]
-            collected_item_ids = set(self.user_data[category].keys())
+            collected_item_ids = set(self.context[category].keys())
             
             # Get items not yet collected, sorted by importance
             available_items = [
@@ -959,7 +814,7 @@ class BioAgeCoach:
     
     def get_recommended_protocols(self) -> List[Dict]:
         """Get protocols recommended for the user based on their biomarkers."""
-        if not self.user_data["biomarkers"]:
+        if not self.context["biomarkers"]:
             return []
         
         # Simple recommendation algorithm
@@ -967,7 +822,7 @@ class BioAgeCoach:
         for protocol in self.protocols.get("protocols", []):
             # Check if protocol targets any of the user's biomarkers
             targets = protocol.get("targeted_biomarkers", [])
-            for biomarker_id in self.user_data["biomarkers"]:
+            for biomarker_id in self.context["biomarkers"]:
                 if biomarker_id in targets:
                     recommended.append(protocol)
                     break
@@ -976,21 +831,21 @@ class BioAgeCoach:
     
     def _get_user_data_context(self) -> str:
         """Get a formatted string of relevant user data context."""
-        if not self.user_data:
+        if not self.context:
             return "No user data available."
         
         context = "Available User Data:\n"
         
         # Basic demographics
-        if "demographics" in self.user_data:
-            demographics = self.user_data["demographics"]
+        if "demographics" in self.context:
+            demographics = self.context["demographics"]
             context += "\nDemographics:\n"
             for key, value in demographics.items():
                 context += f"- {key}: {value}\n"
         
         # Health metrics with units and normal ranges
-        if "health_metrics" in self.user_data:
-            metrics = self.user_data["health_metrics"]
+        if "health_metrics" in self.context:
+            metrics = self.context["health_metrics"]
             context += "\nHealth Metrics (with normal ranges):\n"
             for category, data in metrics.items():
                 if isinstance(data, dict):
@@ -1009,27 +864,27 @@ class BioAgeCoach:
                     context += f"- {category}: {data}\n"
         
         # Fitness metrics with age/sex-specific standards
-        if "fitness_metrics" in self.user_data:
-            fitness = self.user_data["fitness_metrics"]
+        if "fitness_metrics" in self.context:
+            fitness = self.context["fitness_metrics"]
             context += "\nFitness Metrics (with age/sex standards):\n"
             for key, value in fitness.items():
                 # Add standards for key metrics
                 standards_info = ""
-                if key == "push_ups" and "demographics" in self.user_data:
-                    age = self.user_data["demographics"].get("age")
-                    sex = self.user_data["demographics"].get("sex")
+                if key == "push_ups" and "demographics" in self.context:
+                    age = self.context["demographics"].get("age")
+                    sex = self.context["demographics"].get("sex")
                     if age and sex and 18 <= age <= 20 and sex.lower() == "male":
                         standards_info = " (Standards for men 18-20: Poor < 10, Below Average 11-14, Average 15-20, Above Average 21-25, Excellent > 25)"
-                elif key == "grip_strength" and "demographics" in self.user_data:
-                    age = self.user_data["demographics"].get("age")
-                    sex = self.user_data["demographics"].get("sex")
+                elif key == "grip_strength" and "demographics" in self.context:
+                    age = self.context["demographics"].get("age")
+                    sex = self.context["demographics"].get("sex")
                     if age and sex and 18 <= age <= 20 and sex.lower() == "male":
                         standards_info = " (Standards for men 18-20: Poor < 30 kg, Average 30-50 kg, Excellent > 70 kg)"
                 context += f"- {key}: {value}{standards_info}\n"
         
         # Sleep and recovery with recommendations
-        if "sleep_metrics" in self.user_data:
-            sleep = self.user_data["sleep_metrics"]
+        if "sleep_metrics" in self.context:
+            sleep = self.context["sleep_metrics"]
             context += "\nSleep and Recovery (with recommendations):\n"
             for key, value in sleep.items():
                 # Add recommendations for key metrics

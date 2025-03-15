@@ -393,7 +393,7 @@ async def main():
             raise ValueError("OPENAI_API_KEY environment variable is not set")
             
         # Initialize MCP client and servers
-        mcp_client = MultiServerMCPClient()
+        mcp_client = MultiServerMCPClient(api_key=api_key)
         
         # Initialize and register servers
         health_server = HealthServer(api_key)
@@ -402,10 +402,10 @@ async def main():
         bio_age_score_server = BioAgeScoreServer(api_key)
         
         # Register servers with specific types that match module expectations
-        mcp_client.register_server("health", health_server)
-        mcp_client.register_server("research", research_server)
-        mcp_client.register_server("tools", tools_server)
-        mcp_client.register_server("bio_age_score", bio_age_score_server)
+        await mcp_client.add_server("health", health_server)
+        await mcp_client.add_server("research", research_server)
+        await mcp_client.add_server("tools", tools_server)
+        await mcp_client.add_server("bio_age_score", bio_age_score_server)
         
         # Initialize test data for each server
         test_data = {

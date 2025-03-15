@@ -11,51 +11,57 @@ from ..servers.research_server import ResearchServer
 from ..servers.tools_server import ToolsServer
 from ..servers.bio_age_score_server import BioAgeScoreServer
 from ..core.protocols import MCPServer
+from ..client import MCPClient
 
-class MultiServerMCPClient:
-    """Client for interacting with multiple MCP servers."""
+class MultiServerMCPClient(MCPClient):
+    """Client for communicating with multiple MCP servers."""
     
-    def __init__(self):
-        """Initialize the client."""
-        self.servers: Dict[str, MCPServer] = {}
+    def __init__(self, api_key: str):
+        """Initialize the multi-server MCP client.
+        
+        Args:
+            api_key: API key for authentication
+        """
+        super().__init__(api_key)
+        self.active_servers = set()
         self.health_server = None
         self.research_server = None
         self.tools_server = None
         self.bio_age_score_server = None
         self.user_data = {}
     
-    def register_server(self, server_type: str, server: MCPServer) -> None:
-        """Register a server instance.
+    async def add_server(self, server_type: str, server_config: Dict[str, Any]) -> None:
+        """Add a server to the client.
         
         Args:
-            server_type: Type identifier for the server
-            server: Server instance implementing MCPServer protocol
+            server_type: Type of server to add
+            server_config: Server configuration
         """
-        self.servers[server_type] = server
+        self.servers[server_type] = server_config
+        self.active_servers.add(server_type)
         
         # Set instance variables based on server type
         if server_type == "health":
-            self.health_server = server
+            self.health_server = server_config
         elif server_type == "research":
-            self.research_server = server
+            self.research_server = server_config
         elif server_type == "tools":
-            self.tools_server = server
+            self.tools_server = server_config
         elif server_type == "bio_age_score":
-            self.bio_age_score_server = server
+            self.bio_age_score_server = server_config
     
-    def get_server(self, server_type: str) -> Optional[MCPServer]:
-        """Get a registered server by type.
+    async def remove_server(self, server_type: str) -> None:
+        """Remove a server from the client.
         
         Args:
-            server_type: Type identifier for the server
-            
-        Returns:
-            Server instance if registered, None otherwise
+            server_type: Type of server to remove
         """
-        return self.servers.get(server_type)
-    
+        if server_type in self.servers:
+            del self.servers[server_type]
+            self.active_servers.remove(server_type)
+            
     async def send_request(self, server_type: str, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Send a request to the appropriate server based on type.
+        """Send a request to a specific server.
         
         Args:
             server_type: Type of server to send request to
@@ -67,15 +73,10 @@ class MultiServerMCPClient:
         Raises:
             ValueError: If server_type is not registered
         """
-        server = self.get_server(server_type)
-        if not server:
-            raise ValueError(f"No server registered for type: {server_type}")
-        
-        try:
-            return await server.process_request(request_data)
-        except Exception as e:
-            logging.error(f"Error processing request for server {server_type}: {e}")
-            return {"error": f"Request failed: {str(e)}"}
+        if server_type not in self.active_servers:
+            raise ValueError(f"Server type '{server_type}' not registered")
+            
+        return await super().send_request(server_type, request_data)
     
     async def close(self) -> None:
         """Close all server connections."""

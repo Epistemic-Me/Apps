@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Set
 from dataclasses import dataclass
 from enum import Enum
-from ..utils.client import MultiServerMCPClient
+from ..client import MultiServerMCPClient
 
 class ConvoState(Enum):
     """States in the conversation lifecycle."""
@@ -35,8 +35,8 @@ class Tool:
     name: str
     function: callable
     description: str
-    parameters: Dict[str, Any]
-    server_type: str  # The type of server this tool belongs to
+    parameters: Dict[str, Any] = None
+    server_type: str = None  # The type of server this tool belongs to
 
 class ConvoModule(ABC):
     """Base class for conversation modules.
@@ -48,7 +48,7 @@ class ConvoModule(ABC):
     - Coordinates responses across servers
     """
     
-    def __init__(self, api_key: str, topic: str, mcp_client: MultiServerMCPClient):
+    def __init__(self, api_key: str, topic: str, mcp_client: Optional[MultiServerMCPClient] = None):
         """Initialize the conversation module.
         
         Args:
@@ -197,10 +197,14 @@ class ConvoModule(ABC):
             
         Raises:
             ValueError: If server_type is not registered with this module
+            ValueError: If mcp_client is not set
         """
         if server_type not in self.server_types:
             raise ValueError(f"Server type '{server_type}' not registered with module '{self.topic}'")
         
+        if self.mcp_client is None:
+            raise ValueError(f"MCP client not set for module '{self.topic}'")
+            
         return await self.mcp_client.send_request(server_type, request_data)
     
     async def close(self) -> None:

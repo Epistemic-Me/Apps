@@ -8,7 +8,7 @@ from bio_age_coach.mcp.servers.health_server import HealthServer
 from bio_age_coach.mcp.servers.research_server import ResearchServer
 from bio_age_coach.mcp.servers.tools_server import ToolsServer
 from bio_age_coach.mcp.core.router import QueryRouter
-from bio_age_coach.mcp.utils.client import MultiServerMCPClient
+from bio_age_coach.mcp.client import MultiServerMCPClient
 
 @pytest.fixture
 def test_api_key():
@@ -60,7 +60,7 @@ async def tools_server(test_api_key, test_data_dir):
 @pytest.fixture
 async def mcp_client(test_api_key, bio_age_score_server, health_server, research_server, tools_server):
     """Create a MultiServerMCPClient instance with all servers."""
-    client = MultiServerMCPClient()
+    client = MultiServerMCPClient(api_key=test_api_key)
     client.register_server("bio_age_score", bio_age_score_server)
     client.register_server("health", health_server)
     client.register_server("research", research_server)
@@ -68,9 +68,16 @@ async def mcp_client(test_api_key, bio_age_score_server, health_server, research
     return client
 
 @pytest.fixture
-async def mcp_router(mcp_client):
+async def module_registry(mcp_client):
+    """Create a ModuleRegistry instance."""
+    from bio_age_coach.mcp.core.module_registry import ModuleRegistry
+    registry = ModuleRegistry(mcp_client=mcp_client)
+    return registry
+
+@pytest.fixture
+async def mcp_router(mcp_client, module_registry):
     """Create a QueryRouter instance with the MCP client."""
-    return QueryRouter(mcp_client)
+    return QueryRouter(mcp_client, module_registry)
 
 @pytest.fixture
 def sample_health_data():

@@ -3,17 +3,23 @@ BioAge Score conversation module for the Bio Age Coach system.
 Integrates with existing BioAgeScore server functionality.
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 from ..core.convo_module import ConvoModule, Resource, Tool
-from ..utils.client import MultiServerMCPClient
+from ..client import MultiServerMCPClient
 
 class BioAgeScoreModule(ConvoModule):
     """Module for managing bio age score conversations."""
     
-    def __init__(self, api_key: str, mcp_client: MultiServerMCPClient):
-        """Initialize the bio age score module."""
-        super().__init__(api_key, "bio_age_score", mcp_client)
+    def __init__(self, api_key: str, mcp_client: Optional[MultiServerMCPClient] = None, topic: str = "bio_age_score"):
+        """Initialize the bio age score module.
+        
+        Args:
+            api_key: API key for authentication
+            mcp_client: MCP client for server communication
+            topic: Topic for the module
+        """
+        super().__init__(api_key, topic, mcp_client)
         self.user_data = {}
         self.health_data = {}  # Initialize health_data
         
