@@ -23,6 +23,8 @@ def init_database(db_path="data/test_database.db"):
             id INTEGER PRIMARY KEY,
             username TEXT NOT NULL,
             email TEXT NOT NULL,
+            chronological_age INTEGER,
+            biological_sex TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -96,13 +98,13 @@ def init_database(db_path="data/test_database.db"):
     # Check if we already have sample data
     c.execute("SELECT COUNT(*) FROM users")
     if c.fetchone()[0] == 0:
-        # Insert sample users
+        # Insert sample users with age and sex
         sample_users = [
-            (1, "John Smith", "john@example.com"),
-            (2, "Emma Davis", "emma@example.com"),
-            (3, "Michael Chen", "michael@example.com")
+            (1, "John Smith", "john@example.com", 35, "male"),
+            (2, "Emma Davis", "emma@example.com", 55, "female"),
+            (3, "Michael Chen", "michael@example.com", 45, "male")
         ]
-        c.executemany("INSERT INTO users (id, username, email) VALUES (?, ?, ?)", sample_users)
+        c.executemany("INSERT INTO users (id, username, email, chronological_age, biological_sex) VALUES (?, ?, ?, ?, ?)", sample_users)
         
         # Generate sample daily health data for last 14 days
         today = datetime.now().date()

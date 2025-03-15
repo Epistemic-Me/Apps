@@ -41,6 +41,8 @@ DEFAULT_BIOMARKERS = {
         "health_data": {
             "display_name": "Daily Health Data",
             "items": [
+                {"id": "chronological_age", "name": "Age", "unit": "years"},
+                {"id": "biological_sex", "name": "Biological Sex", "unit": ""},
                 {"id": "active_calories", "name": "Active Calories", "unit": "kcal"},
                 {"id": "steps", "name": "Steps", "unit": "steps"},
                 {"id": "sleep", "name": "Sleep Duration", "unit": "hours"},
@@ -265,14 +267,27 @@ def display_health_data_profile(coach):
             st.subheader("Daily Health")
             # Calculate completeness for this category
             health_fields = expected_fields.get("health_data", [])
+            # Remove special fields from health_fields for completeness calculation
+            standard_health_fields = [f for f in health_fields if f not in ["chronological_age", "biological_sex"]]
             available_fields = set(coach.user_data["health_data"].keys())
-            if health_fields:
-                completeness = int(len(available_fields.intersection(health_fields)) / len(health_fields) * 100)
+            if standard_health_fields:
+                completeness = int(len(available_fields.intersection(standard_health_fields)) / len(standard_health_fields) * 100)
                 st.caption(f"Completeness: {completeness}%")
             
             if coach.user_data["health_data"]:
                 st.markdown("#### Available Data")
+                # First show chronological age and biological sex if available
+                if "chronological_age" in coach.user_data["health_data"]:
+                    st.markdown(f"✅ **Age:** {coach.user_data['health_data']['chronological_age']} years")
+                if "biological_sex" in coach.user_data["health_data"]:
+                    st.markdown(f"✅ **Biological Sex:** {coach.user_data['health_data']['biological_sex'].capitalize()}")
+                
+                # Then show other health data
                 for key, value in coach.user_data["health_data"].items():
+                    # Skip age and sex since we already displayed them
+                    if key in ["chronological_age", "biological_sex"]:
+                        continue
+                        
                     # Format the display name
                     display_name = " ".join(word.capitalize() for word in key.split('_'))
                     
@@ -291,7 +306,11 @@ def display_health_data_profile(coach):
                     st.markdown(f"✅ **{display_name}:** {value}{units}")
             
             # Show missing fields
-            missing_fields = [field for field in health_fields if field not in available_fields]
+            missing_fields = []
+            for field in standard_health_fields:  # Only check standard health fields
+                if field not in coach.user_data["health_data"] or coach.user_data["health_data"].get(field) is None:
+                    missing_fields.append(field)
+                    
             if missing_fields:
                 st.markdown("#### Missing Data")
                 for field in missing_fields:

@@ -444,7 +444,6 @@ class BioAgeCoach:
             steps = self.user_data["health_data"].get("steps", 0)
             sleep = self.user_data["health_data"].get("sleep", 0)
             
-            # Physical activity assessment
             if active_calories > 500 and steps > 8000:
                 health_assessment += "an active lifestyle, which is associated with lower biological age. "
             elif active_calories > 350 and steps > 5000:
@@ -452,7 +451,6 @@ class BioAgeCoach:
             else:
                 health_assessment += "lower physical activity levels, which may contribute to accelerated biological aging. "
             
-            # Sleep assessment
             if sleep >= 7:
                 health_assessment += "Your sleep duration is optimal for cellular repair and regeneration, supporting healthy aging."
             elif sleep >= 6:

@@ -5,6 +5,25 @@
       "description": "Activity and health metrics from Apple Health or other health tracking platforms",
       "items": [
         {
+          "id": "chronological_age",
+          "name": "Chronological Age",
+          "description": "Your current age in years",
+          "unit": "years",
+          "normal_range": {
+            "min": 18,
+            "max": 120
+          },
+          "importance": 5
+        },
+        {
+          "id": "sex",
+          "name": "Biological Sex",
+          "description": "Biological sex assigned at birth (used for health metric comparisons)",
+          "unit": "text",
+          "allowed_values": ["male", "female"],
+          "importance": 5
+        },
+        {
           "id": "steps",
           "name": "Daily Steps",
           "description": "Average daily step count over the past week",
