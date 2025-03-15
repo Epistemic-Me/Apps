@@ -7,7 +7,6 @@ import asyncio
 import json
 from dotenv import load_dotenv
 from bio_age_coach.mcp.utils.client import MultiServerMCPClient
-from bio_age_coach.mcp.core.module_registry import ModuleRegistry
 from bio_age_coach.mcp.servers.health_server import HealthServer
 from bio_age_coach.mcp.servers.research_server import ResearchServer
 from bio_age_coach.mcp.servers.tools_server import ToolsServer
@@ -59,9 +58,6 @@ async def init_mcp_servers():
     await mcp_client.add_server("tools", tools_server)
     await mcp_client.add_server("bio_age_score", bio_age_score_server)
 
-    # Initialize conversation module registry with mcp_client
-    module_registry = ModuleRegistry(mcp_client)
-
     # Update each user's data and initialize bio age score server
     for user in test_users:
         # Get metrics data from health server
@@ -92,8 +88,7 @@ async def init_mcp_servers():
     print("Creating router adapter...")
     router_adapter = RouterAdapter(
         semantic_router=semantic_router,
-        mcp_client=mcp_client,
-        module_registry=module_registry
+        mcp_client=mcp_client
     )
 
     # Create BioAgeCoach instance

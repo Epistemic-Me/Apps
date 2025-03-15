@@ -33,7 +33,6 @@ from bio_age_coach.chatbot.prompts import (
 
 from bio_age_coach.mcp.client import MultiServerMCPClient
 from bio_age_coach.router.router_adapter import RouterAdapter
-from bio_age_coach.mcp.core.module_registry import ModuleRegistry
 
 # Load environment variables
 load_dotenv()

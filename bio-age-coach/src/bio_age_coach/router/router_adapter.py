@@ -10,33 +10,23 @@ import logging
 
 from bio_age_coach.router.semantic_router import SemanticRouter
 from bio_age_coach.mcp.client import MultiServerMCPClient
-from bio_age_coach.mcp.core.module_registry import ModuleRegistry
-from bio_age_coach.mcp.core.router import QueryRouter
 
 logger = logging.getLogger(__name__)
 
-class RouterAdapter(QueryRouter):
+class RouterAdapter:
     """Adapter for the SemanticRouter to maintain compatibility with QueryRouter interface."""
     
-    def __init__(self, semantic_router: SemanticRouter, mcp_client: Optional[MultiServerMCPClient] = None, module_registry: Optional[ModuleRegistry] = None):
+    def __init__(self, semantic_router: SemanticRouter, mcp_client: Optional[MultiServerMCPClient] = None):
         """Initialize the router adapter.
         
         Args:
             semantic_router: The semantic router to adapt
             mcp_client: Optional MCP client for backward compatibility
-            module_registry: Optional module registry for backward compatibility
         """
-        # Create a default module registry if none is provided
-        if module_registry is None:
-            module_registry = ModuleRegistry()
-            
         # Create a default MCP client if none is provided
         if mcp_client is None:
             mcp_client = MultiServerMCPClient(api_key="test_key")
             
-        # Initialize the base class with required parameters
-        super().__init__(mcp_client=mcp_client, module_registry=module_registry)
-        
         self.semantic_router = semantic_router
         self.mcp_client = mcp_client
         self.context = {}

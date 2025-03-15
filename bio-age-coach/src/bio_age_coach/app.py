@@ -2,21 +2,19 @@
 
 from typing import Dict, Any, Optional, Tuple
 from .mcp.client import MCPClient, MultiServerMCPClient
-from .mcp.core.module_registry import ModuleRegistry
-from .mcp.core.router import QueryRouter
 from .agents.agent_registry import AgentRegistry
 from .database.models import UserData
 from .chatbot.coach import BioAgeCoach
 from .router.semantic_router import SemanticRouter
 from .router.router_adapter import RouterAdapter
 
-async def init_mcp_servers() -> Tuple[MultiServerMCPClient, QueryRouter]:
+async def init_mcp_servers() -> Tuple[MultiServerMCPClient, RouterAdapter]:
     """Initialize MCP servers and router system.
     
     Returns:
         Tuple containing:
             - MultiServerMCPClient instance
-            - Router adapter instance (compatible with QueryRouter interface)
+            - Router adapter instance
     """
     api_key = "test_key"  # TODO: Get from config
     mcp_client = MultiServerMCPClient(api_key=api_key)

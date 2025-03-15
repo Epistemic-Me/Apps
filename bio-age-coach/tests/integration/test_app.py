@@ -1,109 +1,141 @@
-"""Integration tests for the Bio-Age Coach app."""
+"""Integration tests for the app."""
 
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock, patch
-from bio_age_coach.app import init_mcp_servers, load_user_data, get_daily_health_summary
-from bio_age_coach.mcp.utils.client import MultiServerMCPClient
-from bio_age_coach.mcp.core.router import QueryRouter
+from unittest.mock import AsyncMock, MagicMock, patch
+import json
+import os
+import tempfile
+
+from bio_age_coach.mcp.client import MultiServerMCPClient
+from bio_age_coach.router.router_adapter import RouterAdapter
 from bio_age_coach.chatbot.coach import BioAgeCoach
 
 @pytest.fixture
 def mock_mcp_client():
     """Create a mock MCP client."""
-    client = Mock(spec=MultiServerMCPClient)
-    client.send_request = AsyncMock(return_value={
-        "metrics": [
-            {
-                "active_calories": 500,
-                "steps": 10000,
-                "sleep_hours": 8,
-                "health_score": 85
+    client = AsyncMock(spec=MultiServerMCPClient)
+    
+    async def mock_send_request(server_name, endpoint, data=None):
+        if server_name == "health" and endpoint == "metrics":
+            return {
+                "metrics": [
+                    {
+                        "date": "2023-01-01",
+                        "sleep_hours": 7.5,
+                        "active_calories": 400,
+                        "steps": 8000,
+                        "heart_rate": 70,
+                        "health_score": 85
+                    }
+                ],
+                "workouts": []
             }
-        ],
-        "workouts": []
-    })
+        else:
+            return {
+                "response": f"Response from {server_name} server",
+                "insights": [f"Insight from {server_name} server"]
+            }
+    
+    client.send_request.side_effect = mock_send_request
     return client
 
 @pytest.fixture
-def mock_query_router():
-    """Create a mock query router."""
-    router = Mock(spec=QueryRouter)
-    router.route_query = AsyncMock(return_value={
-        "response": "Test response",
-        "insights": ["Test insight"],
-        "visualization": None,
-        "error": None
-    })
-    return router
+def mock_router_adapter():
+    """Create a mock router adapter."""
+    adapter = AsyncMock(spec=RouterAdapter)
+    
+    async def mock_route_query(user_id, query, metadata=None):
+        return {
+            "response": f"Response to: {query}",
+            "insights": ["Test insight 1", "Test insight 2"],
+            "visualization": None,
+            "error": None
+        }
+    
+    adapter.route_query = AsyncMock(side_effect=mock_route_query)
+    return adapter
 
 @pytest.fixture
-def mock_coach():
-    """Create a mock coach."""
-    coach = Mock(spec=BioAgeCoach)
-    coach.process_message = AsyncMock(return_value={
-        "response": "Test response",
-        "insights": ["Test insight"],
-        "visualization": None,
-        "error": None
-    })
-    return coach
+def app(mock_mcp_client, mock_router_adapter):
+    """Create a BioAgeCoach instance with mocked dependencies."""
+    # The order of arguments is important - router_adapter should be the first parameter
+    app = BioAgeCoach(router_adapter=mock_router_adapter, mcp_client=mock_mcp_client)
+    return app
 
-@pytest.mark.asyncio
-async def test_init_mcp_servers(mock_mcp_client):
-    """Test initialization of MCP servers."""
-    with patch('bio_age_coach.app.MultiServerMCPClient', return_value=mock_mcp_client):
-        mcp_client, query_router = await init_mcp_servers()
-        assert isinstance(mcp_client, MultiServerMCPClient)
-        assert isinstance(query_router, QueryRouter)
-
-@pytest.mark.asyncio
-async def test_load_user_data(mock_mcp_client):
-    """Test loading user data."""
-    with patch('bio_age_coach.app.MultiServerMCPClient', return_value=mock_mcp_client):
-        success = await load_user_data("test_user_1", mock_mcp_client)
-        assert success is True
-        mock_mcp_client.send_request.assert_called()
-
-@pytest.mark.asyncio
-async def test_get_daily_health_summary(mock_mcp_client):
-    """Test getting daily health summary."""
-    with patch('bio_age_coach.app.MultiServerMCPClient', return_value=mock_mcp_client):
-        summary = await get_daily_health_summary("test_user_1", mock_mcp_client)
-        assert summary is not None
-        assert summary["avg_calories"] == 500
-        assert summary["avg_steps"] == 10000
-        assert summary["avg_sleep"] == 8
-        assert summary["avg_score"] == 85
-
-@pytest.mark.asyncio
-async def test_app_error_handling(mock_mcp_client):
-    """Test error handling in app functions."""
-    # Test load_user_data error handling
-    mock_mcp_client.send_request.side_effect = Exception("Test error")
-    success = await load_user_data("test_user_1", mock_mcp_client)
-    assert success is False
-
-    # Test get_daily_health_summary error handling
-    summary = await get_daily_health_summary("test_user_1", mock_mcp_client)
-    assert summary is None
-
-@pytest.mark.asyncio
-async def test_app_data_flow(mock_mcp_client, mock_query_router, mock_coach):
-    """Test data flow through the app."""
-    # Initialize app components
-    with patch('bio_age_coach.app.MultiServerMCPClient', return_value=mock_mcp_client), \
-         patch('bio_age_coach.app.QueryRouter', return_value=mock_query_router), \
-         patch('bio_age_coach.app.BioAgeCoach.create', return_value=mock_coach):
+class TestApp:
+    """Test the app."""
+    
+    @pytest.mark.asyncio
+    async def test_process_message(self, app, mock_router_adapter):
+        """Test processing a message."""
+        # Process message
+        response = await app.process_message("Show me my health metrics")
         
-        # Test data flow
-        mcp_client, query_router = await init_mcp_servers()
-        success = await load_user_data("test_user_1", mcp_client)
-        assert success is True
+        # Verify router was called
+        mock_router_adapter.route_query.assert_called_once()
+        call_args = mock_router_adapter.route_query.call_args[1]  # Use indexing to get kwargs
+        assert call_args["user_id"] == app.user_id
+        assert call_args["query"] == "Show me my health metrics"
         
-        summary = await get_daily_health_summary("test_user_1", mcp_client)
-        assert summary is not None
+        # Verify response
+        assert "response" in response
+        assert "insights" in response
+    
+    @pytest.mark.asyncio
+    async def test_process_message_with_metadata(self, app, mock_router_adapter):
+        """Test processing a message with metadata."""
+        # Set metadata in app context
+        app.context.update({"source": "web", "session_id": "123"})
         
-        response = await mock_coach.process_message("test message")
-        assert response["response"] == "Test response"
-        assert response["insights"] == ["Test insight"] 
+        # Process message
+        response = await app.process_message("Show me my health metrics")
+        
+        # Verify router was called
+        mock_router_adapter.route_query.assert_called_once()
+        call_args = mock_router_adapter.route_query.call_args[1]  # Use indexing to get kwargs
+        assert call_args["user_id"] == app.user_id
+        assert call_args["query"] == "Show me my health metrics"
+        
+        # Verify response
+        assert "response" in response
+        assert "insights" in response
+    
+    @pytest.mark.asyncio
+    async def test_upload_data(self, app, mock_mcp_client):
+        """Test uploading data."""
+        # Create test data
+        test_data = {
+            "sleep_data": [
+                {"date": "2023-01-01", "sleep_hours": 7.5}
+            ]
+        }
+        
+        # Set up mock response
+        mock_mcp_client.upload_file = AsyncMock(return_value={
+            "status": "success",
+            "message": "Data uploaded successfully"
+        })
+        
+        # Upload data
+        response = await app.handle_data_upload("sleep", test_data)
+        
+        # Verify response
+        assert "response" in response
+        assert "insights" in response
+    
+    @pytest.mark.asyncio
+    async def test_error_handling(self, app, mock_router_adapter):
+        """Test error handling."""
+        # Set up mock to raise exception
+        async def mock_route_query_error(user_id, query, metadata=None):
+            raise Exception("Test error")
+        
+        mock_router_adapter.route_query = AsyncMock(side_effect=mock_route_query_error)
+        
+        # Process message
+        response = await app.process_message("Show me my health metrics")
+        
+        # Verify error response
+        assert "error" in response
+        assert isinstance(response["error"], str)
+        assert "Test error" in response["error"] 

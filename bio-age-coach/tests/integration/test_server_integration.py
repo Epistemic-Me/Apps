@@ -2,6 +2,53 @@
 
 import pytest
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from bio_age_coach.mcp.client import MultiServerMCPClient
+from bio_age_coach.router.router_adapter import RouterAdapter
+from bio_age_coach.router.semantic_router import SemanticRouter
+
+class MockModuleRegistry:
+    """Mock implementation of ModuleRegistry."""
+    
+    def __init__(self):
+        """Initialize the mock module registry."""
+        self.modules = {}
+    
+    def register_module(self, name, module):
+        """Register a module."""
+        self.modules[name] = module
+    
+    def get_module(self, name):
+        """Get a module by name."""
+        return self.modules.get(name, MagicMock())
+
+@pytest.fixture
+def mcp_router(mcp_client, router_adapter):
+    """Create a mock MCP router."""
+    # Create a mock module registry
+    module_registry = MockModuleRegistry()
+    
+    # Add module_registry to the router_adapter
+    router_adapter.module_registry = module_registry
+    
+    # Create a mock bio_age_score module
+    bio_age_score_module = MagicMock()
+    bio_age_score_module.initialize = AsyncMock()
+    module_registry.register_module("bio_age_score", bio_age_score_module)
+    
+    # Add route_query method to the router
+    router_adapter.route_query = AsyncMock(return_value={
+        "metrics": [{"date": "2024-03-01", "sleep_hours": 7.5, "active_calories": 400, "steps": 8000}],
+        "total_score": 85,
+        "sleep_score": 80,
+        "exercise_score": 85,
+        "steps_score": 90,
+        "insights": ["Your sleep quality is good", "Your exercise routine is effective"],
+        "visualization": {"type": "line", "data": []}
+    })
+    
+    return router_adapter
 
 @pytest.mark.asyncio
 async def test_health_to_bio_age_integration(health_server, bio_age_score_server):

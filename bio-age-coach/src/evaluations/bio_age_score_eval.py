@@ -1,5 +1,5 @@
 """
-BioAge Score evaluation suite for testing the BioAgeScore conversation module.
+BioAge Score evaluation suite for testing the BioAgeScore agent.
 """
 
 from typing import List, Dict, Any
@@ -12,8 +12,8 @@ import asyncio
 import json
 from datetime import datetime, timedelta
 import random
-from bio_age_coach.mcp.modules.bio_age_score_module import BioAgeScoreModule
-from bio_age_coach.mcp.utils.client import MultiServerMCPClient
+from bio_age_coach.agents.specialized.bio_age_score_agent import BioAgeScoreAgent
+from bio_age_coach.mcp.client import MultiServerMCPClient
 from bio_age_coach.mcp.servers.health_server import HealthServer
 from bio_age_coach.mcp.servers.research_server import ResearchServer
 from bio_age_coach.mcp.servers.tools_server import ToolsServer
@@ -98,15 +98,19 @@ class BioAgeScoreEvaluation(EvaluationSuite):
             if "error" in health_data_response:
                 raise ValueError(f"Failed to get health data: {health_data_response['error']}")
                 
-            # Create and initialize module
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("OPENAI_API_KEY environment variable is not set")
+            # Get bio age score server
+            bio_age_score_server = self.context.mcp_client.servers.get("bio_age_score")
+            if not bio_age_score_server:
+                raise ValueError("Bio age score server not found in MCP client")
+                
+            # Initialize bio age score server with the health data
+            await bio_age_score_server.initialize_data({
+                "user_id": "test_user",
+                "health_data": health_data_response.get("metrics", {})
+            })
             
-            self.module = BioAgeScoreModule(api_key, self.context.mcp_client)
-            
-            # Initialize module with processed health data
-            await self.module.initialize({
+            # Update context for the agent
+            user_context = {
                 "user_id": "test_user",
                 "health_data": health_data_response.get("metrics", {}),
                 "habits": {
@@ -114,7 +118,10 @@ class BioAgeScoreEvaluation(EvaluationSuite):
                     "exercise": ["Morning workouts", "Weekend hiking"],
                     "movement": ["Standing desk", "Walking meetings"]
                 }
-            })
+            }
+            
+            # Update the agent's context
+            self.bio_age_score_agent.update_context(user_context)
             
         except Exception as e:
             raise SetupError(f"Setup error: {str(e)}")
@@ -364,106 +371,66 @@ Would you like a detailed plan for implementing any of these recommendations?"""
         return test_cases
     
     async def run_evaluation(self) -> List[ConversationalTestCase]:
-        """Run the evaluation with metrics."""
-        test_cases = self.get_test_cases()
+        """Run the evaluation and return test cases with results."""
+        # Set up the test environment
+        await self.setup()
         
+        # Create test cases
+        test_cases = self.create_test_cases()
+        
+        # Process each test case
         for test_case in test_cases:
-            # Process each turn in the conversation
             for turn in test_case.turns:
-                # Process the request
-                response = await self.module._process_request({
-                    "message": turn.input,
-                    "conversation_history": [t.input for t in test_case.turns]
-                })
+                # Process the query with the agent
+                response = await self.bio_age_score_agent.process(turn.input, self.context.context)
+                
+                # Set the actual output
                 turn.actual_output = response.get("response", "")
-            
-            # Evaluate the test case with metrics
-            self.knowledge_retention.measure(test_case)
-            self.conversation_relevancy.measure(test_case)
-            self.conversation_completeness.measure(test_case)
+        
+        # Run evaluation
+        results = evaluate(test_cases, metrics=self.metrics)
         
         return test_cases
 
 async def main():
-    """Run the BioAge Score evaluation suite."""
-    try:
-        # Initialize MCP client
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is not set")
-            
-        # Initialize MCP client and servers
-        mcp_client = MultiServerMCPClient(api_key=api_key)
+    """Run the evaluation."""
+    # Create MCP client
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable is not set")
         
-        # Initialize and register servers
-        health_server = HealthServer(api_key)
-        research_server = ResearchServer(api_key)
-        tools_server = ToolsServer(api_key)
-        bio_age_score_server = BioAgeScoreServer(api_key)
-        
-        # Register servers with specific types that match module expectations
-        await mcp_client.add_server("health", health_server)
-        await mcp_client.add_server("research", research_server)
-        await mcp_client.add_server("tools", tools_server)
-        await mcp_client.add_server("bio_age_score", bio_age_score_server)
-        
-        # Initialize test data for each server
-        test_data = {
-            "user_id": "test_user_123",
-            "api_key": api_key
-        }
-        
-        for server in [health_server, research_server, tools_server, bio_age_score_server]:
-            await server.initialize_data(test_data)
-        
-        # Create context with MCP client
-        context = RouterContext(mcp_client=mcp_client)
-        
-        # Create and run evaluation
-        evaluation = BioAgeScoreEvaluation(context)
-        await evaluation.setup()
-        results = await evaluation.run_evaluation()
-        
-        print("\nBioAge Score Module Evaluation Results:")
-        print("=" * 50)
-        
-        # Process results
-        successful_tests = 0
-        failed_tests = 0
-        
-        for i, result in enumerate(results, 1):
-            print(f"\nTest Case {i}:")
-            if result and isinstance(result, ConversationalTestCase):
-                successful_tests += 1
-                last_turn = result.turns[-1]
-                print(f"✓ Input: {last_turn.input}")
-                print(f"✓ Expected Output: {last_turn.expected_output}")
-                print(f"✓ Actual Output: {last_turn.actual_output}")
-                
-                # Print tool chain verification if available
-                if hasattr(last_turn, 'tools_called') and last_turn.tools_called:
-                    print("\nTool Chain:")
-                    for tool in last_turn.tools_called:
-                        print(f"  ➜ {tool.name}")
-                        print(f"    Args: {json.dumps(tool.args, indent=4)}")
-                        print(f"    Response: {json.dumps(tool.response, indent=4)}")
-            else:
-                failed_tests += 1
-                print("✗ Test case failed to process")
-        
-        # Print summary with clear formatting
-        print("\nEvaluation Summary:")
-        print("=" * 50)
-        print(f"Total Test Cases: {len(results)}")
-        print(f"✓ Successful Tests: {successful_tests}")
-        print(f"✗ Failed Tests: {failed_tests}")
-        
-        if failed_tests > 0:
-            print("\nWarning: Some tests failed. Please check the output above for details.")
-        
-    except Exception as e:
-        print(f"Error running BioAge Score evaluation: {e}")
-        raise
+    mcp_client = MultiServerMCPClient(api_key=api_key)
+    
+    # Initialize servers
+    health_server = HealthServer(api_key)
+    research_server = ResearchServer(api_key)
+    tools_server = ToolsServer(api_key)
+    bio_age_score_server = BioAgeScoreServer(api_key)
+    
+    # Register servers with MCP client
+    await mcp_client.add_server("health", health_server)
+    await mcp_client.add_server("research", research_server)
+    await mcp_client.add_server("tools", tools_server)
+    await mcp_client.add_server("bio_age_score", bio_age_score_server)
+    
+    # Create router context
+    context = RouterContext(mcp_client=mcp_client)
+    
+    # Create evaluation suite
+    evaluation = BioAgeScoreEvaluation(context)
+    
+    # Run evaluation
+    test_cases = await evaluation.run_evaluation()
+    
+    # Print results
+    for i, test_case in enumerate(test_cases):
+        print(f"\nTest Case {i+1}:")
+        for j, turn in enumerate(test_case.turns):
+            print(f"  Turn {j+1}:")
+            print(f"    Input: {turn.input}")
+            print(f"    Expected: {turn.expected_output}")
+            print(f"    Actual: {turn.actual_output}")
+            print(f"    Metrics: {turn.metrics}")
 
 if __name__ == "__main__":
     asyncio.run(main()) 

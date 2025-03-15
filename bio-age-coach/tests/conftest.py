@@ -3,12 +3,15 @@
 import os
 import pytest
 import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 from bio_age_coach.mcp.servers.bio_age_score_server import BioAgeScoreServer
 from bio_age_coach.mcp.servers.health_server import HealthServer
 from bio_age_coach.mcp.servers.research_server import ResearchServer
 from bio_age_coach.mcp.servers.tools_server import ToolsServer
-from bio_age_coach.mcp.core.router import QueryRouter
+from bio_age_coach.router.semantic_router import SemanticRouter
+from bio_age_coach.router.router_adapter import RouterAdapter
 from bio_age_coach.mcp.client import MultiServerMCPClient
+from bio_age_coach.agents.specialized.bio_age_score_agent import BioAgeScoreAgent
 
 @pytest.fixture
 def test_api_key():
@@ -68,16 +71,50 @@ async def mcp_client(test_api_key, bio_age_score_server, health_server, research
     return client
 
 @pytest.fixture
-async def module_registry(mcp_client):
-    """Create a ModuleRegistry instance."""
-    from bio_age_coach.mcp.core.module_registry import ModuleRegistry
-    registry = ModuleRegistry(mcp_client=mcp_client)
-    return registry
+async def test_agents(test_api_key, mcp_client):
+    """Create test agents for the semantic router."""
+    bio_age_score_agent = BioAgeScoreAgent(
+        name="BioAgeScoreAgent",
+        description="I analyze health metrics to calculate and explain biological age scores.",
+        api_key=test_api_key,
+        mcp_client=mcp_client
+    )
+    return [bio_age_score_agent]
 
 @pytest.fixture
-async def mcp_router(mcp_client, module_registry):
-    """Create a QueryRouter instance with the MCP client."""
-    return QueryRouter(mcp_client, module_registry)
+async def semantic_router(test_api_key, test_agents):
+    """Create a SemanticRouter instance with test agents."""
+    # Create a mock for the SemanticRouter class
+    with patch('bio_age_coach.router.semantic_router.OpenAIEmbeddings') as mock_embeddings, \
+         patch('bio_age_coach.router.semantic_router.FAISS') as mock_faiss, \
+         patch('bio_age_coach.router.semantic_router.AsyncOpenAI') as mock_openai:
+        
+        # Configure the mock embeddings
+        mock_embeddings.return_value.embed_documents.return_value = [[0.1, 0.2, 0.3] for _ in range(10)]
+        mock_embeddings.return_value.embed_query.return_value = [0.1, 0.2, 0.3]
+        
+        # Configure the mock FAISS
+        mock_faiss.from_documents.return_value.similarity_search_with_score.return_value = [
+            (MagicMock(page_content="Test content", metadata={"agent_name": "BioAgeScoreAgent"}), 0.9)
+        ]
+        
+        # Create the router with the mocked dependencies
+        router = SemanticRouter(api_key=test_api_key, agents=test_agents)
+        
+        # Mock the _route method to return the first agent
+        async def mock_route(query, context):
+            if test_agents:
+                return test_agents[0], 0.9
+            return None, 0.0
+            
+        router._route = AsyncMock(side_effect=mock_route)
+        
+        return router
+
+@pytest.fixture
+async def router_adapter(semantic_router, mcp_client):
+    """Create a RouterAdapter instance with the semantic router."""
+    return RouterAdapter(semantic_router=semantic_router, mcp_client=mcp_client)
 
 @pytest.fixture
 def sample_health_data():
