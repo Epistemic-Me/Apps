@@ -303,7 +303,7 @@ To run all evaluation suites:
 
 ```bash
 cd Apps/bio-age-coach
-ALL_EVALS=true python src/evaluations/chatbot_eval.py
+ALL_EVALS=true DEEPEVAL_SAVE_RESULTS=true DEEPEVAL_VERBOSE=true python src/evaluations/bio_age_score_eval.py
 ```
 
 #### Running Specific Evaluations
@@ -312,21 +312,25 @@ To run a specific evaluation suite:
 
 ```bash
 cd Apps/bio-age-coach
-python src/evaluations/chatbot_eval.py
+DEEPEVAL_SAVE_RESULTS=true DEEPEVAL_VERBOSE=true python src/evaluations/bio_age_score_eval.py
 ```
 
-By default, this runs the primary evaluation suite. You can modify the script to run specific evaluations.
+Note: The `DEEPEVAL_SAVE_RESULTS=true` environment variable is required to save results to Confident AI, and `DEEPEVAL_VERBOSE=true` provides detailed output during evaluation.
 
-#### Viewing Evaluation Results
+#### Viewing Results
 
-After running evaluations, you can view detailed results in Confident AI:
+View detailed evaluation results in Confident AI:
 
-1. Login to Confident AI:
-```bash
-deepeval login --confident-api-key "your-confident-api-key"
+1. Ensure your Confident AI API key is set in the `.env` file:
+```
+CONFIDENT_AI_KEY=your_confident_ai_key
 ```
 
-2. Access the dashboard to view test results, metrics, and performance trends.
+2. Access the dashboard using the URL provided in the evaluation output to view:
+   - Test case results
+   - Metric scores
+   - Performance trends
+   - Failure analysis
 
 ### Debugging the Application
 
@@ -366,14 +370,16 @@ The evaluation framework is organized into specialized test suites:
 Run all evaluation suites:
 ```bash
 cd Apps/bio-age-coach
-ALL_EVALS=true python src/evaluations/chatbot_eval.py
+ALL_EVALS=true DEEPEVAL_SAVE_RESULTS=true DEEPEVAL_VERBOSE=true python src/evaluations/bio_age_score_eval.py
 ```
 
-Run a specific evaluation suite (e.g., fitness metrics):
+Run a specific evaluation suite:
 ```bash
 cd Apps/bio-age-coach
-python src/evaluations/chatbot_eval.py
+DEEPEVAL_SAVE_RESULTS=true DEEPEVAL_VERBOSE=true python src/evaluations/bio_age_score_eval.py
 ```
+
+Note: The `DEEPEVAL_SAVE_RESULTS=true` environment variable is required to save results to Confident AI, and `DEEPEVAL_VERBOSE=true` provides detailed output during evaluation.
 
 #### Isolated Testing with Router Contexts
 
@@ -450,12 +456,12 @@ The framework uses two primary metrics:
 
 View detailed evaluation results in Confident AI:
 
-1. Login to Confident AI:
-```bash
-deepeval login --confident-api-key "your-confident-api-key"
+1. Ensure your Confident AI API key is set in the `.env` file:
+```
+CONFIDENT_AI_KEY=your_confident_ai_key
 ```
 
-2. Access the dashboard to view:
+2. Access the dashboard using the URL provided in the evaluation output to view:
    - Test case results
    - Metric scores
    - Performance trends
@@ -468,7 +474,7 @@ To create a new evaluation suite:
 1. Create a new file in `src/evaluations/`
 2. Inherit from `EvaluationSuite`
 3. Implement `setup()` and `create_test_cases()`
-4. Add the suite to `chatbot_eval.py`
+4. Add the suite to `bio_age_score_eval.py`
 
 Example:
 ```python
@@ -504,4 +510,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.

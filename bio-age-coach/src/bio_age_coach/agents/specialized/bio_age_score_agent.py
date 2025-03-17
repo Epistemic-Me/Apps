@@ -141,15 +141,53 @@ class BioAgeScoreAgent(Agent):
                 if "error" not in response:
                     health_data = response.get("metrics", [])
             
-            # Process query based on bio age data
-            if "how" in query.lower() and "reduce" in query.lower():
-                return await self._process_reduction_query(query, bio_age_data, health_data)
-            elif "factor" in query.lower() or "affect" in query.lower():
-                return await self._process_factors_query(query, bio_age_data, health_data)
-            elif "trend" in query.lower() or "change" in query.lower() or "over time" in query.lower():
-                return await self._process_trend_query(query, bio_age_data, health_data)
+            # Determine query type and route to appropriate server endpoint
+            query_lower = query.lower()
+            
+            # Prepare request data
+            request_data = {
+                "user_id": context.get("user_id", "default_user"),
+                "health_data": health_data,
+                "bio_age_data": bio_age_data,
+                "query": query
+            }
+            
+            # Route query to appropriate server endpoint based on query type
+            if any(keyword in query_lower for keyword in ["how", "reduce", "improve", "lower", "decrease", "better", "optimize", "action", "recommendation", "suggestion", "help"]):
+                response = await self.mcp_client.send_request(
+                    "bio_age_score",
+                    {
+                        "type": "process_reduction_query",
+                        "data": request_data
+                    }
+                )
+            elif "factor" in query_lower or "affect" in query_lower or "influence" in query_lower or "impact" in query_lower:
+                response = await self.mcp_client.send_request(
+                    "bio_age_score",
+                    {
+                        "type": "process_factors_query",
+                        "data": request_data
+                    }
+                )
+            elif any(keyword in query_lower for keyword in ["trend", "change", "over time", "progress", "history", "track"]):
+                response = await self.mcp_client.send_request(
+                    "bio_age_score",
+                    {
+                        "type": "process_trend_query",
+                        "data": request_data
+                    }
+                )
             else:
-                return await self._process_score_query(query, bio_age_data, health_data)
+                response = await self.mcp_client.send_request(
+                    "bio_age_score",
+                    {
+                        "type": "process_score_query",
+                        "data": request_data
+                    }
+                )
+            
+            # Return the response from the server
+            return response
                 
         except Exception as e:
             return {
@@ -157,300 +195,6 @@ class BioAgeScoreAgent(Agent):
                 "insights": [],
                 "visualization": None,
                 "error": str(e)
-            }
-    
-    async def _process_score_query(self, query: str, bio_age_data: Dict[str, Any], health_data: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Process bio age score query.
-        
-        Args:
-            query: User query
-            bio_age_data: Bio age data
-            health_data: Health data
-            
-        Returns:
-            Dict[str, Any]: Response
-        """
-        # Check if we have bio age data
-        if not bio_age_data or "score" not in bio_age_data:
-            return {
-                "response": "I don't have enough data to calculate your biological age score. Please upload more health data.",
-                "insights": [
-                    "Biological age calculation requires health metrics like sleep, exercise, and biomarkers.",
-                    "Regular tracking of health data improves the accuracy of biological age estimation."
-                ],
-                "visualization": None,
-                "error": None
-            }
-        
-        # Extract bio age score
-        bio_age_score = bio_age_data.get("score", 0)
-        chronological_age = bio_age_data.get("chronological_age", 0)
-        
-        # Generate insights
-        insights = []
-        
-        if chronological_age > 0:
-            age_difference = bio_age_score - chronological_age
-            
-            if age_difference < -5:
-                insights.append(f"Your biological age is {abs(age_difference):.1f} years younger than your chronological age, indicating excellent health practices.")
-            elif age_difference < 0:
-                insights.append(f"Your biological age is {abs(age_difference):.1f} years younger than your chronological age, suggesting good health practices.")
-            elif age_difference < 5:
-                insights.append(f"Your biological age is {age_difference:.1f} years older than your chronological age, indicating room for improvement.")
-            else:
-                insights.append(f"Your biological age is {age_difference:.1f} years older than your chronological age, suggesting significant health optimization opportunities.")
-        
-        # Add insights based on health data
-        if health_data:
-            sleep_data = [day for day in health_data if "sleep_hours" in day]
-            if sleep_data:
-                avg_sleep = sum(day["sleep_hours"] for day in sleep_data) / len(sleep_data)
-                if avg_sleep < 7:
-                    insights.append(f"Your average sleep of {avg_sleep:.1f} hours may be contributing to a higher biological age.")
-                else:
-                    insights.append(f"Your average sleep of {avg_sleep:.1f} hours supports a lower biological age.")
-            
-            exercise_data = [day for day in health_data if "steps" in day]
-            if exercise_data:
-                avg_steps = sum(day["steps"] for day in exercise_data) / len(exercise_data)
-                if avg_steps < 5000:
-                    insights.append(f"Your average of {int(avg_steps):,} steps per day may be contributing to a higher biological age.")
-                else:
-                    insights.append(f"Your average of {int(avg_steps):,} steps per day supports a lower biological age.")
-        
-        # Create visualization data
-        visualization = None
-        if "history" in bio_age_data:
-            history = bio_age_data["history"]
-            dates = [entry.get("date", "") for entry in history]
-            scores = [entry.get("score", 0) for entry in history]
-            
-            if dates and scores:
-                visualization = {
-                    "dates": dates,
-                    "scores": scores,
-                    "reference_ranges": {
-                        "optimal_min": [chronological_age - 5] * len(dates) if chronological_age > 0 else [bio_age_score - 5] * len(dates),
-                        "optimal_max": [chronological_age] * len(dates) if chronological_age > 0 else [bio_age_score] * len(dates),
-                        "good_min": [chronological_age - 10] * len(dates) if chronological_age > 0 else [bio_age_score - 10] * len(dates),
-                        "good_max": [chronological_age + 5] * len(dates) if chronological_age > 0 else [bio_age_score + 5] * len(dates)
-                    }
-                }
-        
-        return {
-            "response": f"Your current biological age score is {bio_age_score:.1f} years." if chronological_age == 0 else f"Your biological age is {bio_age_score:.1f} years compared to your chronological age of {chronological_age} years.",
-            "insights": insights,
-            "visualization": visualization,
-            "error": None
-        }
-    
-    async def _process_reduction_query(self, query: str, bio_age_data: Dict[str, Any], health_data: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Process bio age reduction query.
-        
-        Args:
-            query: User query
-            bio_age_data: Bio age data
-            health_data: Health data
-            
-        Returns:
-            Dict[str, Any]: Response
-        """
-        # Generate recommendations
-        recommendations = [
-            "Optimize sleep: Aim for 7-9 hours of quality sleep per night.",
-            "Regular exercise: Include both cardio and strength training.",
-            "Nutrition: Focus on a plant-rich diet with adequate protein.",
-            "Stress management: Practice meditation or other stress-reduction techniques.",
-            "Social connections: Maintain strong social relationships.",
-            "Cognitive stimulation: Engage in learning and mentally challenging activities.",
-            "Avoid toxins: Limit alcohol, avoid smoking, and minimize exposure to environmental toxins."
-        ]
-        
-        # Personalize recommendations based on health data
-        if health_data:
-            sleep_data = [day for day in health_data if "sleep_hours" in day]
-            if sleep_data:
-                avg_sleep = sum(day["sleep_hours"] for day in sleep_data) / len(sleep_data)
-                if avg_sleep < 7:
-                    recommendations.insert(0, f"Increase sleep duration: Your current average of {avg_sleep:.1f} hours is below optimal. Aim for at least 7 hours.")
-            
-            exercise_data = [day for day in health_data if "steps" in day]
-            if exercise_data:
-                avg_steps = sum(day["steps"] for day in exercise_data) / len(exercise_data)
-                if avg_steps < 8000:
-                    recommendations.insert(1, f"Increase physical activity: Your current average of {int(avg_steps):,} steps is below optimal. Aim for at least 8,000-10,000 steps daily.")
-        
-        return {
-            "response": "Here are evidence-based strategies to reduce your biological age:",
-            "insights": recommendations,
-            "visualization": None,
-            "error": None
-        }
-    
-    async def _process_factors_query(self, query: str, bio_age_data: Dict[str, Any], health_data: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Process bio age factors query.
-        
-        Args:
-            query: User query
-            bio_age_data: Bio age data
-            health_data: Health data
-            
-        Returns:
-            Dict[str, Any]: Response
-        """
-        # Generate factors
-        factors = [
-            "Sleep quality and duration: Affects cellular repair, hormone regulation, and immune function.",
-            "Physical activity: Influences cardiovascular health, muscle mass, and metabolic function.",
-            "Nutrition: Impacts inflammation, cellular health, and metabolic processes.",
-            "Stress levels: Affects telomere length, inflammation, and cellular aging.",
-            "Social connections: Strong relationships are associated with longevity and reduced biological age.",
-            "Cognitive engagement: Mental stimulation supports brain health and cognitive resilience.",
-            "Environmental exposures: Toxins, pollution, and UV radiation can accelerate aging."
-        ]
-        
-        # Personalize factors based on health data
-        personalized_insights = []
-        
-        if health_data:
-            sleep_data = [day for day in health_data if "sleep_hours" in day]
-            if sleep_data:
-                avg_sleep = sum(day["sleep_hours"] for day in sleep_data) / len(sleep_data)
-                if avg_sleep < 7:
-                    personalized_insights.append(f"Your average sleep of {avg_sleep:.1f} hours may be increasing your biological age. Each additional hour of sleep (up to 8 hours) can reduce biological age by approximately 0.3-0.5 years.")
-                else:
-                    personalized_insights.append(f"Your average sleep of {avg_sleep:.1f} hours supports a lower biological age.")
-            
-            exercise_data = [day for day in health_data if "steps" in day]
-            if exercise_data:
-                avg_steps = sum(day["steps"] for day in exercise_data) / len(exercise_data)
-                if avg_steps < 5000:
-                    personalized_insights.append(f"Your average of {int(avg_steps):,} steps per day may be increasing your biological age. Increasing to 7,500+ steps daily can reduce biological age by approximately 0.5-1.0 years.")
-                else:
-                    personalized_insights.append(f"Your average of {int(avg_steps):,} steps per day supports a lower biological age.")
-        
-        # Combine general factors with personalized insights
-        all_insights = factors + personalized_insights if personalized_insights else factors
-        
-        return {
-            "response": "The following factors influence your biological age:",
-            "insights": all_insights,
-            "visualization": None,
-            "error": None
-        }
-    
-    async def _process_trend_query(self, query: str, bio_age_data: Dict[str, Any], health_data: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Process bio age trend query.
-        
-        Args:
-            query: User query
-            bio_age_data: Bio age data
-            health_data: Health data
-            
-        Returns:
-            Dict[str, Any]: Response
-        """
-        # Check if we have history data
-        if not bio_age_data or "history" not in bio_age_data or not bio_age_data["history"]:
-            return {
-                "response": "I don't have enough historical data to show trends in your biological age. Continue tracking your health metrics to build this data over time.",
-                "insights": [
-                    "Biological age trends require regular tracking of health metrics.",
-                    "Weekly or monthly assessments provide the best insights into biological age changes."
-                ],
-                "visualization": None,
-                "error": None
-            }
-        
-        # Extract history data
-        history = bio_age_data["history"]
-        dates = [entry.get("date", "") for entry in history]
-        scores = [entry.get("score", 0) for entry in history]
-        
-        # Calculate trend
-        if len(scores) >= 2:
-            first_score = scores[0]
-            last_score = scores[-1]
-            change = last_score - first_score
-            
-            # Generate insights
-            insights = []
-            
-            if change < -1:
-                insights.append(f"Your biological age has decreased by {abs(change):.1f} years over the tracked period, showing excellent progress.")
-            elif change < 0:
-                insights.append(f"Your biological age has decreased slightly by {abs(change):.1f} years, showing positive progress.")
-            elif change < 1:
-                insights.append(f"Your biological age has remained relatively stable, changing by only {change:.1f} years.")
-            else:
-                insights.append(f"Your biological age has increased by {change:.1f} years, suggesting opportunities for health optimization.")
-            
-            # Add insights about contributing factors
-            if health_data:
-                # Split health data into earlier and later periods
-                mid_point = len(health_data) // 2
-                earlier_data = health_data[:mid_point]
-                later_data = health_data[mid_point:]
-                
-                # Compare sleep patterns
-                earlier_sleep = [day for day in earlier_data if "sleep_hours" in day]
-                later_sleep = [day for day in later_data if "sleep_hours" in day]
-                
-                if earlier_sleep and later_sleep:
-                    avg_earlier_sleep = sum(day["sleep_hours"] for day in earlier_sleep) / len(earlier_sleep)
-                    avg_later_sleep = sum(day["sleep_hours"] for day in later_sleep) / len(later_sleep)
-                    sleep_change = avg_later_sleep - avg_earlier_sleep
-                    
-                    if abs(sleep_change) > 0.5:
-                        if sleep_change > 0:
-                            insights.append(f"Your average sleep has increased by {sleep_change:.1f} hours, which may be contributing to the observed biological age changes.")
-                        else:
-                            insights.append(f"Your average sleep has decreased by {abs(sleep_change):.1f} hours, which may be contributing to the observed biological age changes.")
-                
-                # Compare activity patterns
-                earlier_steps = [day for day in earlier_data if "steps" in day]
-                later_steps = [day for day in later_data if "steps" in day]
-                
-                if earlier_steps and later_steps:
-                    avg_earlier_steps = sum(day["steps"] for day in earlier_steps) / len(earlier_steps)
-                    avg_later_steps = sum(day["steps"] for day in later_steps) / len(later_steps)
-                    steps_change = avg_later_steps - avg_earlier_steps
-                    
-                    if abs(steps_change) > 1000:
-                        if steps_change > 0:
-                            insights.append(f"Your average daily steps have increased by {int(steps_change):,}, which may be contributing to the observed biological age changes.")
-                        else:
-                            insights.append(f"Your average daily steps have decreased by {int(abs(steps_change)):,}, which may be contributing to the observed biological age changes.")
-            
-            # Create visualization
-            chronological_age = bio_age_data.get("chronological_age", 0)
-            visualization = {
-                "dates": dates,
-                "scores": scores,
-                "reference_ranges": {
-                    "optimal_min": [chronological_age - 5] * len(dates) if chronological_age > 0 else [min(scores) - 5] * len(dates),
-                    "optimal_max": [chronological_age] * len(dates) if chronological_age > 0 else [min(scores)] * len(dates),
-                    "good_min": [chronological_age - 10] * len(dates) if chronological_age > 0 else [min(scores) - 10] * len(dates),
-                    "good_max": [chronological_age + 5] * len(dates) if chronological_age > 0 else [min(scores) + 5] * len(dates)
-                }
-            }
-            
-            return {
-                "response": f"Your biological age has changed from {first_score:.1f} to {last_score:.1f} years over the tracked period.",
-                "insights": insights,
-                "visualization": visualization,
-                "error": None
-            }
-        else:
-            return {
-                "response": "I only have one data point for your biological age, so I can't show a trend yet. Continue tracking your health metrics to build this data over time.",
-                "insights": [
-                    "Your current biological age score is " + str(scores[0]) + " years.",
-                    "Regular tracking will help establish trends in your biological age."
-                ],
-                "visualization": None,
-                "error": None
             }
     
     async def create_observation_context(self, data_type: str, user_id: Optional[str] = None) -> Optional[ObservationContext]:

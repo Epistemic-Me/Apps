@@ -1,0 +1,62 @@
+[
+  {
+    "input": "What's my current bio age score?",
+    "actual_output": null,
+    "expected_output": "Based on your health data, your biological age is 36.2 years, which is 1.2 years higher than your chronological age of 35.\n\nKey factors affecting your score:\n- Sleep: You're getting 7.0 hours of sleep, which is below the optimal 7.5 hours\n- Activity: You're burning 318 active calories and taking 7669 steps per day\n- Exercise frequency: 2-3 times per week\n\nTo improve your biological age score, consider:\n1. Increasing your sleep duration\n2. Increasing your daily activity level\n3. Maintaining your daily step count",
+    "context": [
+      "User Profile: {\n  \"age\": 35,\n  \"gender\": \"male\",\n  \"fitness_level\": \"intermediate\",\n  \"health_goals\": [\n    \"improve sleep\",\n    \"increase activity\",\n    \"reduce stress\"\n  ],\n  \"current_habits\": {\n    \"sleep_hours\": 6.5,\n    \"active_calories\": 300,\n    \"steps\": 7000,\n    \"exercise_frequency\": \"2-3 times per week\"\n  },\n  \"health_beliefs\": [\n    \"Sleep is important but work comes first\",\n    \"Exercise is necessary but finding time is hard\",\n    \"Stress management should be a priority\"\n  ]\n}",
+      "Health Data: {\n  \"sleep_hours\": 7.0,\n  \"active_calories\": 318,\n  \"steps\": 7669,\n  \"date\": \"2025-03-16\"\n}",
+      "Initial Query: What's my current bio age score?",
+      "Expected Analysis Points:",
+      "- Calculate and explain bio age score",
+      "- Reference specific health metrics",
+      "- Compare to chronological age",
+      "- Identify areas for improvement"
+    ]
+  },
+  {
+    "input": "How can I improve my biological age?",
+    "actual_output": null,
+    "expected_output": "Here are specific recommendations to improve your biological age score:\n\n1. Aim to increase your sleep from 7.0 to 7.5-8 hours per night\n2. Work towards burning 500+ active calories daily (currently at 318)\n3. Maintain your current step count\n\nFocus on these areas to reduce your biological age and improve your overall health. Remember to:\n- Make gradual changes to build sustainable habits\n- Track your progress daily\n- Adjust your goals based on how you feel",
+    "context": [
+      "User Profile: {\n  \"age\": 35,\n  \"gender\": \"male\",\n  \"fitness_level\": \"intermediate\",\n  \"health_goals\": [\n    \"improve sleep\",\n    \"increase activity\",\n    \"reduce stress\"\n  ],\n  \"current_habits\": {\n    \"sleep_hours\": 6.5,\n    \"active_calories\": 300,\n    \"steps\": 7000,\n    \"exercise_frequency\": \"2-3 times per week\"\n  },\n  \"health_beliefs\": [\n    \"Sleep is important but work comes first\",\n    \"Exercise is necessary but finding time is hard\",\n    \"Stress management should be a priority\"\n  ]\n}",
+      "Health Data: {\n  \"sleep_hours\": 7.0,\n  \"active_calories\": 318,\n  \"steps\": 7669,\n  \"date\": \"2025-03-16\"\n}",
+      "Initial Query: How can I improve my biological age?",
+      "Expected Analysis Points:",
+      "- Review current health metrics",
+      "- Identify key areas for improvement",
+      "- Provide specific, actionable recommendations",
+      "- Set realistic goals"
+    ]
+  },
+  {
+    "input": "What's my current bio age score?",
+    "actual_output": null,
+    "expected_output": "Based on your health data, your biological age is 48.0 years, which is 3.0 years higher than your chronological age of 45.\n\nKey factors affecting your score:\n- Sleep: You're getting 7.5 hours of sleep, which is above the optimal 7.5 hours\n- Activity: You're burning 166 active calories and taking 5817 steps per day\n- Exercise frequency: 1-2 times per week\n\nTo improve your biological age score, consider:\n1. Maintaining your sleep duration\n2. Increasing your daily activity level\n3. Increasing your daily step count",
+    "context": [
+      "User Profile: {\n  \"age\": 45,\n  \"gender\": \"female\",\n  \"fitness_level\": \"beginner\",\n  \"health_goals\": [\n    \"weight management\",\n    \"better sleep quality\",\n    \"more energy\"\n  ],\n  \"current_habits\": {\n    \"sleep_hours\": 7.0,\n    \"active_calories\": 200,\n    \"steps\": 5000,\n    \"exercise_frequency\": \"1-2 times per week\"\n  },\n  \"health_beliefs\": [\n    \"It's harder to stay fit as you age\",\n    \"Good sleep is essential for health\",\n    \"Small changes can make a big difference\"\n  ]\n}",
+      "Health Data: {\n  \"sleep_hours\": 7.5,\n  \"active_calories\": 166,\n  \"steps\": 5817,\n  \"date\": \"2025-03-16\"\n}",
+      "Initial Query: What's my current bio age score?",
+      "Expected Analysis Points:",
+      "- Calculate and explain bio age score",
+      "- Reference specific health metrics",
+      "- Compare to chronological age",
+      "- Identify areas for improvement"
+    ]
+  },
+  {
+    "input": "How can I improve my biological age?",
+    "actual_output": null,
+    "expected_output": "Here are specific recommendations to improve your biological age score:\n\n1. Work towards burning 500+ active calories daily (currently at 166)\n2. Increase your daily steps from 5817 to at least 7,500\n3. Maintain your current step count\n\nFocus on these areas to reduce your biological age and improve your overall health. Remember to:\n- Make gradual changes to build sustainable habits\n- Track your progress daily\n- Adjust your goals based on how you feel",
+    "context": [
+      "User Profile: {\n  \"age\": 45,\n  \"gender\": \"female\",\n  \"fitness_level\": \"beginner\",\n  \"health_goals\": [\n    \"weight management\",\n    \"better sleep quality\",\n    \"more energy\"\n  ],\n  \"current_habits\": {\n    \"sleep_hours\": 7.0,\n    \"active_calories\": 200,\n    \"steps\": 5000,\n    \"exercise_frequency\": \"1-2 times per week\"\n  },\n  \"health_beliefs\": [\n    \"It's harder to stay fit as you age\",\n    \"Good sleep is essential for health\",\n    \"Small changes can make a big difference\"\n  ]\n}",
+      "Health Data: {\n  \"sleep_hours\": 7.5,\n  \"active_calories\": 166,\n  \"steps\": 5817,\n  \"date\": \"2025-03-16\"\n}",
+      "Initial Query: How can I improve my biological age?",
+      "Expected Analysis Points:",
+      "- Review current health metrics",
+      "- Identify key areas for improvement",
+      "- Provide specific, actionable recommendations",
+      "- Set realistic goals"
+    ]
+  }
+]

@@ -341,7 +341,7 @@ class Agent(ABC):
         Args:
             context_updates: New context information to merge with existing context
         """
-        self.state.update(context_updates)
+        self.context.update(context_updates)
     
     def get_capabilities(self) -> List[str]:
         """Get the list of capabilities this agent provides.
