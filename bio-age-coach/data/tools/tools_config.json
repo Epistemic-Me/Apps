@@ -1,0 +1,17 @@
+{
+    "tools": [
+        "biological_age",
+        "health_score",
+        "fitness_metrics",
+        "analyze"
+    ],
+    "fitness_metrics": {
+        "push_ups": 30,
+        "grip_strength": 90,
+        "vo2_max": 45,
+        "resting_heart_rate": 65,
+        "one_leg_stand": 45,
+        "sit_and_reach": 15
+    },
+    "tool_name": "tools"
+}

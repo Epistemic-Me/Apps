@@ -1,0 +1,215 @@
+{
+  "user_id": "test_user_123",
+  "data_series": [
+    {
+      "date": "2025-03-11",
+      "sleep_hours": 8.2,
+      "active_calories": 573,
+      "steps": 9622,
+      "active_minutes": 51
+    },
+    {
+      "date": "2025-03-10",
+      "sleep_hours": 6.9,
+      "active_calories": 578,
+      "steps": 8346,
+      "active_minutes": 48
+    },
+    {
+      "date": "2025-03-09",
+      "sleep_hours": 7.8,
+      "active_calories": 380,
+      "steps": 7711,
+      "active_minutes": 54
+    },
+    {
+      "date": "2025-03-08",
+      "sleep_hours": 8.4,
+      "active_calories": 554,
+      "steps": 10548,
+      "active_minutes": 37
+    },
+    {
+      "date": "2025-03-07",
+      "sleep_hours": 8.2,
+      "active_calories": 539,
+      "steps": 9905,
+      "active_minutes": 51
+    },
+    {
+      "date": "2025-03-06",
+      "sleep_hours": 6.4,
+      "active_calories": 314,
+      "steps": 9190,
+      "active_minutes": 37
+    },
+    {
+      "date": "2025-03-05",
+      "sleep_hours": 6.4,
+      "active_calories": 554,
+      "steps": 7523,
+      "active_minutes": 33
+    },
+    {
+      "date": "2025-03-04",
+      "sleep_hours": 8.4,
+      "active_calories": 514,
+      "steps": 10121,
+      "active_minutes": 39
+    },
+    {
+      "date": "2025-03-03",
+      "sleep_hours": 8.0,
+      "active_calories": 483,
+      "steps": 9360,
+      "active_minutes": 38
+    },
+    {
+      "date": "2025-03-02",
+      "sleep_hours": 6.3,
+      "active_calories": 617,
+      "steps": 9593,
+      "active_minutes": 40
+    },
+    {
+      "date": "2025-03-01",
+      "sleep_hours": 6.1,
+      "active_calories": 342,
+      "steps": 7659,
+      "active_minutes": 59
+    },
+    {
+      "date": "2025-02-28",
+      "sleep_hours": 8.0,
+      "active_calories": 526,
+      "steps": 10219,
+      "active_minutes": 45
+    },
+    {
+      "date": "2025-02-27",
+      "sleep_hours": 7.9,
+      "active_calories": 419,
+      "steps": 10829,
+      "active_minutes": 60
+    },
+    {
+      "date": "2025-02-26",
+      "sleep_hours": 7.8,
+      "active_calories": 553,
+      "steps": 8839,
+      "active_minutes": 39
+    },
+    {
+      "date": "2025-02-25",
+      "sleep_hours": 6.9,
+      "active_calories": 527,
+      "steps": 10923,
+      "active_minutes": 34
+    },
+    {
+      "date": "2025-02-24",
+      "sleep_hours": 7.6,
+      "active_calories": 503,
+      "steps": 10449,
+      "active_minutes": 33
+    },
+    {
+      "date": "2025-02-23",
+      "sleep_hours": 8.1,
+      "active_calories": 575,
+      "steps": 10161,
+      "active_minutes": 57
+    },
+    {
+      "date": "2025-02-22",
+      "sleep_hours": 6.9,
+      "active_calories": 584,
+      "steps": 11716,
+      "active_minutes": 30
+    },
+    {
+      "date": "2025-02-21",
+      "sleep_hours": 7.3,
+      "active_calories": 348,
+      "steps": 7658,
+      "active_minutes": 50
+    },
+    {
+      "date": "2025-02-20",
+      "sleep_hours": 6.0,
+      "active_calories": 386,
+      "steps": 6232,
+      "active_minutes": 54
+    },
+    {
+      "date": "2025-02-19",
+      "sleep_hours": 8.3,
+      "active_calories": 597,
+      "steps": 9311,
+      "active_minutes": 34
+    },
+    {
+      "date": "2025-02-18",
+      "sleep_hours": 6.7,
+      "active_calories": 641,
+      "steps": 10175,
+      "active_minutes": 43
+    },
+    {
+      "date": "2025-02-17",
+      "sleep_hours": 7.5,
+      "active_calories": 500,
+      "steps": 7563,
+      "active_minutes": 51
+    },
+    {
+      "date": "2025-02-16",
+      "sleep_hours": 8.4,
+      "active_calories": 557,
+      "steps": 10351,
+      "active_minutes": 37
+    },
+    {
+      "date": "2025-02-15",
+      "sleep_hours": 8.5,
+      "active_calories": 565,
+      "steps": 10316,
+      "active_minutes": 45
+    },
+    {
+      "date": "2025-02-14",
+      "sleep_hours": 6.3,
+      "active_calories": 642,
+      "steps": 8219,
+      "active_minutes": 58
+    },
+    {
+      "date": "2025-02-13",
+      "sleep_hours": 6.9,
+      "active_calories": 595,
+      "steps": 7769,
+      "active_minutes": 31
+    },
+    {
+      "date": "2025-02-12",
+      "sleep_hours": 6.9,
+      "active_calories": 382,
+      "steps": 6274,
+      "active_minutes": 48
+    },
+    {
+      "date": "2025-02-11",
+      "sleep_hours": 8.4,
+      "active_calories": 544,
+      "steps": 10438,
+      "active_minutes": 51
+    },
+    {
+      "date": "2025-02-10",
+      "sleep_hours": 6.2,
+      "active_calories": 649,
+      "steps": 10704,
+      "active_minutes": 38
+    }
+  ]
+}

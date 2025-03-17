@@ -1,958 +1,843 @@
-"""
-Bio Age Coach - Streamlit App
-"""
+"""Streamlit application for the Bio Age Coach."""
 
 import os
+import asyncio
 import streamlit as st
 import matplotlib.pyplot as plt
 import numpy as np
-import json
-from src.chatbot.coach import BioAgeCoach
-from src.database.db_connector import DatabaseConnector, initialize_coach_with_user_data
-from src.database.init_db import init_database
 from dotenv import load_dotenv
-import datetime
-
-# Set page configuration - this must be the first Streamlit command
-st.set_page_config(page_title="Bio Age Coach", page_icon="🧬", layout="wide")
+from bio_age_coach.chatbot.coach import BioAgeCoach
+from bio_age_coach.mcp.utils.client import MultiServerMCPClient
+from bio_age_coach.mcp.servers.health_server import HealthServer
+from bio_age_coach.mcp.servers.research_server import ResearchServer
+from bio_age_coach.mcp.servers.tools_server import ToolsServer
+from bio_age_coach.mcp.servers.bio_age_score_server import BioAgeScoreServer
+from bio_age_coach.router.router_adapter import RouterAdapter
+from bio_age_coach.router.semantic_router import SemanticRouter
+from bio_age_coach.agents.factory import create_agents
+import json
+import seaborn as sns
+import pandas as pd
+from matplotlib.colors import LinearSegmentedColormap
 
 # Load environment variables
 load_dotenv()
 
-# Ensure data directory exists
-if not os.path.exists("data"):
-    os.makedirs("data")
+async def init_mcp_servers():
+    """Initialize MCP servers and conversation modules."""
+    api_key = os.getenv("OPENAI_API_KEY", "default_key")
+    papers_dir = "data/papers"
+    test_data_path = os.path.join(os.path.dirname(__file__), "data/test_health_data")
 
-# Initialize database if it doesn't exist
-db_path = "data/test_database.db"
-if not os.path.exists(db_path):
-    try:
-        # Ensure data directory exists
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        # Initialize database with sample data
-        init_database(db_path)
-        print("Database initialized successfully")  # Use print instead of st.toast for initialization
-    except Exception as e:
-        print(f"Error initializing database: {e}")  # Use print instead of st.error for initialization
+    # Initialize test users
+    test_users = [
+        {"id": "test_user_1", "username": "Test User 1"}
+    ]
 
-# Default biomarkers data
-DEFAULT_BIOMARKERS = {
-    "categories": {
-        "health_data": {
-            "display_name": "Daily Health Data",
-            "items": [
-                {"id": "chronological_age", "name": "Age", "unit": "years"},
-                {"id": "biological_sex", "name": "Biological Sex", "unit": ""},
-                {"id": "active_calories", "name": "Active Calories", "unit": "kcal"},
-                {"id": "steps", "name": "Steps", "unit": "steps"},
-                {"id": "sleep", "name": "Sleep Duration", "unit": "hours"},
-                {"id": "resting_heart_rate", "name": "Resting Heart Rate", "unit": "bpm"}
-            ]
-        },
-        "bio_age_tests": {
-            "display_name": "Bio-Age Tests",
-            "items": [
-                {"id": "push_ups", "name": "Push-ups", "unit": "reps"},
-                {"id": "grip_strength", "name": "Grip Strength", "unit": "kg"},
-                {"id": "one_leg_stand", "name": "One-Leg Stand", "unit": "seconds"}
-            ]
-        },
-        "biomarkers": {
-            "display_name": "Biomarkers",
-            "items": [
-                {"id": "hba1c", "name": "HbA1c", "unit": "%"},
-                {"id": "hdl", "name": "HDL Cholesterol", "unit": "mg/dL"},
-                {"id": "ldl", "name": "LDL Cholesterol", "unit": "mg/dL"}
-            ]
-        }
-    }
-}
+    # Create MCP client first
+    mcp_client = MultiServerMCPClient(api_key=api_key)
 
-# Create biomarkers.json if it doesn't exist
-if not os.path.exists("data/biomarkers.json"):
-    with open("data/biomarkers.json", "w") as f:
-        json.dump(DEFAULT_BIOMARKERS, f, indent=2)
+    # Initialize servers
+    health_server = HealthServer(api_key)
+    # Initialize with test data path - HealthServer will load all CSV files
+    await health_server.initialize_data({
+        "test_data_path": test_data_path,
+        "users": test_users,
+        "process_test_data": True  # Tell HealthServer to process all CSV files
+    })
 
-# Create protocols.json if it doesn't exist
-if not os.path.exists("data/protocols.json"):
-    with open("data/protocols.json", "w") as f:
-        json.dump({"protocols": []}, f, indent=2)
+    research_server = ResearchServer(api_key, papers_dir)
+    tools_server = ToolsServer(api_key)
+    bio_age_score_server = BioAgeScoreServer(api_key)
 
-# Initialize session state
-if "coach" not in st.session_state:
-    st.session_state.coach = BioAgeCoach()
+    # Register servers with MCP client
+    await mcp_client.add_server("health", health_server)
+    await mcp_client.add_server("research", research_server)
+    await mcp_client.add_server("tools", tools_server)
+    await mcp_client.add_server("bio_age_score", bio_age_score_server)
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "current_category" not in st.session_state:
-    st.session_state.current_category = "health_data"  # Changed default to health_data
-
-if "selected_user_id" not in st.session_state:
-    st.session_state.selected_user_id = None
-
-if "user_data_loaded" not in st.session_state:
-    st.session_state.user_data_loaded = False
-
-if "db_initialized" not in st.session_state:
-    try:
-        # Connect to the database
-        st.session_state.db = DatabaseConnector(db_path)
-        st.session_state.db_initialized = True
-        
-        # Verify database has users
-        users = st.session_state.db.get_all_users()
-        if not users:
-            # If no users found, try to reinitialize
-            init_database(db_path)
-            print("Database reinitialized successfully")  # Use print instead of st.toast for initialization
-            # Reconnect to the database
-            st.session_state.db = DatabaseConnector(db_path)
-    except Exception as e:
-        st.session_state.db_initialized = False
-        print(f"Database connection error: {e}")  # Use print instead of st.error for initialization
-
-# Initialize category options
-if "category_options" not in st.session_state:
-    st.session_state.category_options = {}
-    try:
-        for category_key, category_data in st.session_state.coach.biomarkers.get("categories", {}).items():
-            st.session_state.category_options[category_key] = category_data.get("display_name", category_key)
-    except Exception as e:
-        # Fallback to default categories if there's an error
-        st.session_state.category_options = {
-            "health_data": "Daily Health Data",
-            "bio_age_tests": "Bio-Age Tests",
-            "biomarkers": "Biomarkers"
-        }
-        st.warning("Using default categories due to missing or invalid biomarkers data.")
-
-def draw_completeness_chart(completeness_data):
-    """Draw a radar chart showing data completeness across categories."""
-    categories = list(completeness_data.keys())
-    values = list(completeness_data.values())
-    
-    # Number of categories
-    N = len(categories)
-    
-    # Create angles for each category
-    angles = np.linspace(0, 2*np.pi, N, endpoint=False).tolist()
-    
-    # Make the plot circular by appending the first value to the end
-    values.append(values[0])
-    angles.append(angles[0])
-    categories.append(categories[0])
-    
-    # Create the plot
-    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
-    
-    # Draw one axis per variable and add labels
-    plt.xticks(angles[:-1], categories[:-1], color='grey', size=8)
-    
-    # Draw the chart
-    ax.plot(angles, values, linewidth=2, linestyle='solid')
-    ax.fill(angles, values, alpha=0.25)
-    
-    # Set y-axis limits
-    ax.set_ylim(0, 1)
-    
-    # Add percentage labels at specific radii
-    ax.set_rticks([0.25, 0.5, 0.75, 1.0])  # Set radii where we want labels
-    ax.set_yticklabels(['25%', '50%', '75%', '100%'], fontsize=7)  # Set labels
-    
-    # Add a title
-    plt.title('Health Data Completeness', size=11)
-    
-    return fig
-
-def load_user_data(user_id):
-    """Load user data from the database into the coach."""
-    if not st.session_state.db_initialized:
-        print("Database is not initialized")  # Use print instead of st.error for initialization
-        return False
-    
-    try:
-        # Reset the coach to clear any existing data
-        st.session_state.coach.reset()
-        
-        # Initialize coach with user data from database
-        completeness = initialize_coach_with_user_data(st.session_state.coach, st.session_state.db, user_id)
-        
-        # Get user info
-        user_info = st.session_state.db.get_user_info(user_id)
-        
-        if user_info and completeness > 0:
-            # Create data summary
-            data_summary = st.session_state.coach.get_existing_data_summary()
-            initial_assessment = st.session_state.coach.get_initial_biological_age_assessment()
-            
-            # Set up the welcome message based on data completeness
-            welcome_message = f"👋 Hello {user_info['username']}! I've loaded your health data profile, which is currently {int(completeness*100)}% complete."
-            
-            if completeness < 0.2:
-                welcome_message += "\n\nYou're just getting started! Let's collect some fundamental measurements to better understand your biological age factors."
-            elif completeness < 0.5:
-                welcome_message += "\n\nYou have a good foundation of health data. Let's fill in some key metrics to get a clearer picture of your biological age."
-            elif completeness < 0.8:
-                welcome_message += "\n\nYour health profile is quite comprehensive. We can now provide a meaningful assessment of your biological age factors."
-            else:
-                welcome_message += "\n\nYou have an excellent health profile with comprehensive data. This allows for a detailed analysis of your biological age and optimization opportunities."
-            
-            # Add the welcome message to the chat
-            st.session_state.messages = []
-            st.session_state.messages.append({"role": "assistant", "content": welcome_message})
-            
-            return True
-        else:
-            print("No data found for selected user")  # Use print instead of st.error for initialization
-            return False
-    except Exception as e:
-        print(f"Error loading user data: {e}")  # Use print instead of st.error for initialization
-        return False
-
-def get_daily_health_summary(user_id):
-    """Get a summary of the user's daily health metrics from the database."""
-    if not st.session_state.db_initialized:
-        return None
-    
-    try:
-        # Get the daily health data for the user
-        daily_data = st.session_state.db.get_daily_health_data(user_id, limit=14)  # Last 14 days
-        
-        if not daily_data:
-            return None
-        
-        # Calculate averages
-        avg_calories = sum(d['active_calories'] for d in daily_data) / len(daily_data)
-        avg_steps = sum(d['steps'] for d in daily_data) / len(daily_data)
-        avg_sleep = sum(d['sleep_hours'] for d in daily_data) / len(daily_data)
-        avg_score = sum(d['daily_score'] for d in daily_data) / len(daily_data)
-        
-        # Create a summary
-        summary = {
-            "avg_calories": round(avg_calories, 1),
-            "avg_steps": round(avg_steps, 0),
-            "avg_sleep": round(avg_sleep, 1),
-            "avg_score": round(avg_score, 1),
-            "days": len(daily_data),
-            "latest_date": daily_data[0]['date'] if daily_data else None
-        }
-        
-        return summary
-    except Exception as e:
-        print(f"Error getting daily health summary: {e}")  # Use print instead of st.error for initialization
-        return None
-
-def display_health_data_profile(coach):
-    """
-    Display the user's health data profile in the sidebar as context for the chat.
-    
-    Args:
-        coach: The Bio-Age Coach instance with loaded user data
-    """
-    if not coach.user_data:
-        return
-    
-    with st.sidebar.expander("📊 YOUR HEALTH PROFILE", expanded=True):
-        # Create tabs for different categories
-        tabs = st.tabs(["Health", "Bio Tests", "Biomarkers", "Measurements", "Other"])
-        
-        # Get all expected fields from the biomarkers categories
-        expected_fields = {}
-        for category_key, category_data in coach.biomarkers.get("categories", {}).items():
-            expected_fields[category_key] = [item["id"] for item in category_data.get("items", [])]
-        
-        # Daily Health Data tab
-        with tabs[0]:
-            st.subheader("Daily Health")
-            # Calculate completeness for this category
-            health_fields = expected_fields.get("health_data", [])
-            # Remove special fields from health_fields for completeness calculation
-            standard_health_fields = [f for f in health_fields if f not in ["chronological_age", "biological_sex"]]
-            available_fields = set(coach.user_data["health_data"].keys())
-            if standard_health_fields:
-                completeness = int(len(available_fields.intersection(standard_health_fields)) / len(standard_health_fields) * 100)
-                st.caption(f"Completeness: {completeness}%")
-            
-            if coach.user_data["health_data"]:
-                st.markdown("#### Available Data")
-                # First show chronological age and biological sex if available
-                if "chronological_age" in coach.user_data["health_data"]:
-                    st.markdown(f"✅ **Age:** {coach.user_data['health_data']['chronological_age']} years")
-                if "biological_sex" in coach.user_data["health_data"]:
-                    st.markdown(f"✅ **Biological Sex:** {coach.user_data['health_data']['biological_sex'].capitalize()}")
-                
-                # Then show other health data
-                for key, value in coach.user_data["health_data"].items():
-                    # Skip age and sex since we already displayed them
-                    if key in ["chronological_age", "biological_sex"]:
-                        continue
-                        
-                    # Format the display name
-                    display_name = " ".join(word.capitalize() for word in key.split('_'))
-                    
-                    # Add units where appropriate
-                    units = ""
-                    if "calories" in key:
-                        units = " kcal"
-                    elif key == "sleep":
-                        units = " hrs"
-                    elif "heart_rate" in key:
-                        units = " bpm"
-                    elif "pressure" in key:
-                        units = " mmHg"
-                    
-                    # Display the value with a green indicator
-                    st.markdown(f"✅ **{display_name}:** {value}{units}")
-            
-            # Show missing fields
-            missing_fields = []
-            for field in standard_health_fields:  # Only check standard health fields
-                if field not in coach.user_data["health_data"] or coach.user_data["health_data"].get(field) is None:
-                    missing_fields.append(field)
-                    
-            if missing_fields:
-                st.markdown("#### Missing Data")
-                for field in missing_fields:
-                    # Get display name from biomarkers definition
-                    display_name = field
-                    for item in coach.biomarkers.get("categories", {}).get("health_data", {}).get("items", []):
-                        if item["id"] == field:
-                            display_name = item["name"]
-                            break
-                    
-                    # Display as missing with a red indicator
-                    st.markdown(f"❌ **{display_name}**")
-            
-            if not coach.user_data["health_data"] and not missing_fields:
-                st.caption("No daily health data available")
-        
-        # Bio-Age Tests tab
-        with tabs[1]:
-            st.subheader("Bio-Age Tests")
-            # Calculate completeness for this category
-            bio_test_fields = expected_fields.get("bio_age_tests", [])
-            available_fields = set(coach.user_data["bio_age_tests"].keys())
-            if bio_test_fields:
-                completeness = int(len(available_fields.intersection(bio_test_fields)) / len(bio_test_fields) * 100)
-                st.caption(f"Completeness: {completeness}%")
-            
-            if coach.user_data["bio_age_tests"]:
-                st.markdown("#### Available Tests")
-                for key, value in coach.user_data["bio_age_tests"].items():
-                    # Format the display name
-                    display_name = " ".join(word.capitalize() for word in key.split('_'))
-                    
-                    # Add units where appropriate
-                    units = ""
-                    if key == "push_ups":
-                        units = " reps"
-                    elif key == "grip_strength":
-                        units = " kg"
-                    elif key == "one_leg_stand":
-                        units = " sec"
-                    elif key == "vo2_max":
-                        units = " ml/kg/min"
-                    
-                    # Display the value with a green indicator
-                    st.markdown(f"✅ **{display_name}:** {value}{units}")
-            
-            # Show missing fields
-            missing_fields = [field for field in bio_test_fields if field not in available_fields]
-            if missing_fields:
-                st.markdown("#### Missing Tests")
-                for field in missing_fields:
-                    # Get display name from biomarkers definition
-                    display_name = field
-                    for item in coach.biomarkers.get("categories", {}).get("bio_age_tests", {}).get("items", []):
-                        if item["id"] == field:
-                            display_name = item["name"]
-                            break
-                    
-                    # Display as missing with a red indicator
-                    st.markdown(f"❌ **{display_name}**")
-            
-            if not coach.user_data["bio_age_tests"] and not missing_fields:
-                st.caption("No bio-age test data available")
-        
-        # Biomarkers tab
-        with tabs[2]:
-            st.subheader("Biomarkers")
-            # Calculate completeness for this category
-            biomarker_fields = expected_fields.get("biomarkers", [])
-            available_fields = set(coach.user_data["biomarkers"].keys())
-            if biomarker_fields:
-                completeness = int(len(available_fields.intersection(biomarker_fields)) / len(biomarker_fields) * 100)
-                st.caption(f"Completeness: {completeness}%")
-            
-            if coach.user_data["biomarkers"]:
-                st.markdown("#### Available Biomarkers")
-                for key, value in coach.user_data["biomarkers"].items():
-                    # Format the display name
-                    display_name = key.upper() if len(key) <= 3 else " ".join(word.capitalize() for word in key.split('_'))
-                    
-                    # Add units where appropriate
-                    units = ""
-                    if key in ["hdl", "ldl", "triglycerides"]:
-                        units = " mg/dL"
-                    elif key == "hba1c":
-                        units = "%"
-                    elif key == "crp":
-                        units = " mg/L"
-                    elif key == "fasting_glucose":
-                        units = " mg/dL"
-                    
-                    # Display the value with a green indicator
-                    st.markdown(f"✅ **{display_name}:** {value}{units}")
-            
-            # Show missing fields
-            missing_fields = [field for field in biomarker_fields if field not in available_fields]
-            if missing_fields:
-                st.markdown("#### Missing Biomarkers")
-                for field in missing_fields:
-                    # Get display name from biomarkers definition
-                    display_name = field.upper() if len(field) <= 3 else " ".join(word.capitalize() for word in field.split('_'))
-                    for item in coach.biomarkers.get("categories", {}).get("biomarkers", {}).get("items", []):
-                        if item["id"] == field:
-                            display_name = item["name"]
-                            break
-                    
-                    # Display as missing with a red indicator
-                    st.markdown(f"❌ **{display_name}**")
-            
-            if not coach.user_data["biomarkers"] and not missing_fields:
-                st.caption("No biomarker data available")
-        
-        # Measurements tab
-        with tabs[3]:
-            st.subheader("Measurements")
-            # Calculate completeness for this category
-            measurement_fields = expected_fields.get("measurements", [])
-            available_fields = set(coach.user_data["measurements"].keys())
-            if measurement_fields:
-                completeness = int(len(available_fields.intersection(measurement_fields)) / len(measurement_fields) * 100)
-                st.caption(f"Completeness: {completeness}%")
-            
-            if coach.user_data["measurements"]:
-                st.markdown("#### Available Measurements")
-                for key, value in coach.user_data["measurements"].items():
-                    # Format the display name
-                    display_name = " ".join(word.capitalize() for word in key.split('_'))
-                    
-                    # Add units where appropriate
-                    units = ""
-                    if key == "body_fat":
-                        units = "%"
-                    elif key in ["waist_circumference", "hip_circumference"]:
-                        units = " cm"
-                    elif key == "waist_to_hip":
-                        units = " ratio"
-                    
-                    # Display the value with a green indicator
-                    st.markdown(f"✅ **{display_name}:** {value}{units}")
-            
-            # Show missing fields
-            missing_fields = [field for field in measurement_fields if field not in available_fields]
-            if missing_fields:
-                st.markdown("#### Missing Measurements")
-                for field in missing_fields:
-                    # Get display name from biomarkers definition
-                    display_name = " ".join(word.capitalize() for word in field.split('_'))
-                    for item in coach.biomarkers.get("categories", {}).get("measurements", {}).get("items", []):
-                        if item["id"] == field:
-                            display_name = item["name"]
-                            break
-                    
-                    # Display as missing with a red indicator
-                    st.markdown(f"❌ **{display_name}**")
-            
-            if not coach.user_data["measurements"] and not missing_fields:
-                st.caption("No measurement data available")
-        
-        # Other data tab (lab results, capabilities)
-        with tabs[4]:
-            st.subheader("Other Data")
-            
-            # Lab Results
-            lab_fields = expected_fields.get("lab_results", [])
-            available_lab_fields = set(coach.user_data["lab_results"].keys())
-            
-            # Capabilities
-            capability_fields = expected_fields.get("capabilities", [])
-            available_capability_fields = set(coach.user_data["capabilities"].keys())
-            
-            # Combined completeness
-            all_fields = lab_fields + capability_fields
-            all_available = available_lab_fields.union(available_capability_fields)
-            if all_fields:
-                completeness = int(len(all_available.intersection(all_fields)) / len(all_fields) * 100)
-                st.caption(f"Completeness: {completeness}%")
-            
-            # Lab Results
-            if coach.user_data["lab_results"]:
-                st.markdown("#### Available Lab Results")
-                for key, value in coach.user_data["lab_results"].items():
-                    display_name = " ".join(word.capitalize() for word in key.split('_'))
-                    
-                    # Add units where appropriate
-                    units = ""
-                    if key == "vitamin_d":
-                        units = " ng/mL"
-                    
-                    st.markdown(f"✅ **{display_name}:** {value}{units}")
-            
-            # Show missing lab fields
-            missing_lab_fields = [field for field in lab_fields if field not in available_lab_fields]
-            if missing_lab_fields:
-                st.markdown("#### Missing Lab Results")
-                for field in missing_lab_fields:
-                    # Get display name
-                    display_name = " ".join(word.capitalize() for word in field.split('_'))
-                    for item in coach.biomarkers.get("categories", {}).get("lab_results", {}).get("items", []):
-                        if item["id"] == field:
-                            display_name = item["name"]
-                            break
-                    
-                    st.markdown(f"❌ **{display_name}**")
-            
-            # Capabilities
-            if coach.user_data["capabilities"]:
-                st.markdown("#### Available Capabilities")
-                for key, value in coach.user_data["capabilities"].items():
-                    display_name = " ".join(word.capitalize() for word in key.split('_'))
-                    
-                    # Add units where appropriate
-                    units = ""
-                    if key == "plank":
-                        units = " sec"
-                    elif key == "sit_and_reach":
-                        units = " cm"
-                    
-                    st.markdown(f"✅ **{display_name}:** {value}{units}")
-            
-            # Show missing capability fields
-            missing_capability_fields = [field for field in capability_fields if field not in available_capability_fields]
-            if missing_capability_fields:
-                st.markdown("#### Missing Capabilities")
-                for field in missing_capability_fields:
-                    # Get display name
-                    display_name = " ".join(word.capitalize() for word in field.split('_'))
-                    for item in coach.biomarkers.get("categories", {}).get("capabilities", {}).get("items", []):
-                        if item["id"] == field:
-                            display_name = item["name"]
-                            break
-                    
-                    st.markdown(f"❌ **{display_name}**")
-            
-            if not coach.user_data["lab_results"] and not coach.user_data["capabilities"] and not missing_lab_fields and not missing_capability_fields:
-                st.caption("No additional data available")
-
-def show_completeness_indicators():
-    """Show completeness indicators for all data categories."""
-    st.header("Health Profile Completeness")
-    
-    # Get completeness data
-    completeness_data = {}
-    overall = 0
-    
-    for category in st.session_state.coach.biomarkers.get("categories", {}):
-        display_name = st.session_state.coach.biomarkers["categories"][category]["display_name"]
-        completeness = st.session_state.coach.calculate_category_completeness(category)
-        completeness_data[display_name] = completeness
-        
-        # Show progress bar for each category
-        percentage = int(completeness * 100)
-        st.write(f"{display_name}: {percentage}%")
-        st.progress(completeness)
-    
-    # Calculate and show overall completeness
-    overall = st.session_state.coach.calculate_overall_completeness()
-    overall_percentage = int(overall * 100)
-    
-    st.write("---")
-    st.write(f"**Overall Completeness: {overall_percentage}%**")
-    st.progress(overall)
-    
-    # Show radar chart if we have data in at least one category
-    if overall > 0:
-        st.write("---")
-        radar_chart = draw_completeness_chart(completeness_data)
-        st.pyplot(radar_chart)
-    
-    # Suggest next measurements
-    if overall < 0.8:  # Only show suggestions if profile is less than 80% complete
-        st.write("---")
-        st.subheader("Suggested Next Measurements")
-        
-        # Use the formatted suggestions from coach
-        suggestions_text = st.session_state.coach.format_missing_data_suggestions(limit=3)
-        st.markdown(suggestions_text)
-
-def show_daily_health_dashboard(user_id):
-    """Show a dashboard of the user's daily health metrics if available."""
-    if not st.session_state.db_initialized:
-        return
-    
-    # Get daily health summary
-    summary = get_daily_health_summary(user_id)
-    
-    if not summary:
-        return
-    
-    st.header(f"Daily Health Metrics (Last {summary['days']} days)")
-    
-    # Create 4 columns for the metrics
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Avg. Active Calories", f"{summary['avg_calories']}")
-    
-    with col2:
-        st.metric("Avg. Steps", f"{int(summary['avg_steps']):,}")
-    
-    with col3:
-        st.metric("Avg. Sleep (hrs)", f"{summary['avg_sleep']}")
-    
-    with col4:
-        st.metric("Avg. Health Score", f"{summary['avg_score']}/100")
-    
-    # Get the data for plotting
-    try:
-        daily_data = st.session_state.db.get_daily_health_data(user_id, limit=14)
-        
-        if daily_data:
-            # Reverse to get chronological order
-            daily_data.reverse()
-            
-            # Extract data for plotting
-            dates = [d['date'] for d in daily_data]
-            scores = [d['daily_score'] for d in daily_data]
-            
-            # Create a simple line chart
-            fig, ax = plt.subplots(figsize=(10, 3))
-            ax.plot(dates, scores, marker='o', linestyle='-', color='#1f77b4')
-            ax.set_title('Daily Health Scores')
-            ax.set_ylabel('Score (0-100)')
-            ax.set_ylim(0, 100)
-            ax.grid(True, linestyle='--', alpha=0.7)
-            
-            # Rotate date labels for better readability
-            plt.xticks(rotation=45)
-            plt.tight_layout()
-            
-            st.pyplot(fig)
-    except Exception as e:
-        st.error(f"Error plotting daily health data: {e}")
-
-def main():
-    """Main function to run the Bio Age Coach."""
-    # Initialize all session state variables at the start
-    if "coach" not in st.session_state:
-        st.session_state.coach = BioAgeCoach()
-    
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    
-    if "current_category" not in st.session_state:
-        st.session_state.current_category = "health_data"
-    
-    if "selected_user_id" not in st.session_state:
-        st.session_state.selected_user_id = None
-    
-    if "user_data_loaded" not in st.session_state:
-        st.session_state.user_data_loaded = False
-    
-    if "category_options" not in st.session_state:
-        st.session_state.category_options = {}
-        for category_key, category_data in st.session_state.coach.biomarkers.get("categories", {}).items():
-            st.session_state.category_options[category_key] = category_data.get("display_name", category_key)
-    
-    # Main layout
-    st.sidebar.title("🧬 Bio Age Coach")
-    
-    # Initialize database connector if not already done
-    if "db_initialized" not in st.session_state:
-        try:
-            db_path = "data/test_database.db"
-            # Try to initialize the database if it doesn't exist
-            if not os.path.exists(db_path):
-                init_database(db_path)
-                print("Database initialized successfully")  # Use print instead of st.toast for initialization
-            
-            # Connect to the database
-            st.session_state.db = DatabaseConnector(db_path)
-            st.session_state.db_initialized = True
-            
-            # Verify database has users
-            users = st.session_state.db.get_all_users()
-            if not users:
-                # If no users found, try to reinitialize
-                init_database(db_path)
-                print("Database reinitialized successfully")  # Use print instead of st.toast for initialization
-        except Exception as e:
-            st.session_state.db_initialized = False
-            print(f"Database initialization failed: {str(e)}")  # Use print instead of st.error for initialization
-            st.info("Please check the application logs for more details.")
-    
-    # Add database initialization section in sidebar
-    with st.sidebar.expander("⚙️ Database Management", expanded=False):
-        st.caption("Initialize or reset the database with sample data.")
-        
-        # Define db_path here so it's available in the button callback
-        db_path = "data/test_database.db"
-        
-        # Show current database status
-        if st.session_state.db_initialized:
-            st.success("Database is initialized and connected")
-            try:
-                users = st.session_state.db.get_all_users()
-                st.info(f"Found {len(users)} users in the database")
-            except Exception as e:
-                st.warning("Connected but unable to query users")
-        else:
-            st.error("Database is not initialized")
-        
-        # Add database reset section
-        st.write("---")
-        st.subheader("Reset Database")
-        st.caption("Warning: This will delete all existing data!")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🗑️ Delete Database"):
-                try:
-                    # Close database connection
-                    if hasattr(st.session_state, 'db'):
-                        del st.session_state.db
-                    
-                    # Remove the database file
-                    if os.path.exists(db_path):
-                        os.remove(db_path)
-                        st.session_state.db_initialized = False
-                        st.success("Database deleted successfully")
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"Error deleting database: {str(e)}")
-        
-        with col2:
-            if st.button("🔄 Reinitialize"):
-                try:
-                    # Ensure the data directory exists
-                    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-                    
-                    # Initialize the database
-                    init_database(db_path)
-                    
-                    # Reconnect to the database
-                    st.session_state.db = DatabaseConnector(db_path)
-                    st.session_state.db_initialized = True
-                    
-                    # Verify the database has users
-                    users = st.session_state.db.get_all_users()
-                    if users:
-                        st.success("Database reinitialized successfully")
-                        st.rerun()
-                    else:
-                        st.error("Database reinitialized but no users found")
-                except Exception as e:
-                    st.error(f"Error reinitializing database: {str(e)}")
-        
-        # Add section for creating new sample users
-        st.write("---")
-        st.subheader("Create Sample User")
-        st.caption("Add a new user with specified data completeness")
-        
-        # Generate default username and email
-        default_username = f"user_{datetime.datetime.now().strftime('%m%d_%H%M')}"
-        default_email = f"{default_username}@example.com"
-        
-        # Input fields for new user with defaults
-        new_username = st.text_input("Username", value=default_username, help="Change if desired, or use default generated username")
-        new_email = st.text_input("Email", value=default_email, help="Change if desired, or use default generated email")
-        target_completion = st.slider("Target Data Completion %", min_value=0, max_value=100, value=80, step=10, 
-                                    help="This will evenly distribute data across all health categories")
-        
-        # Add button to create user
-        if st.button("Create Sample User"):
-            try:
-                # Create new user in database
-                new_user = {
-                    "username": new_username,
-                    "email": new_email,
-                    "target_completion": target_completion / 100.0  # Convert to decimal
-                }
-                
-                # Add user to database with specified completion level
-                user_id = st.session_state.db.add_sample_user(new_user)
-                st.success(f"Created new user '{new_username}' with {target_completion}% target completion")
-                
-                # Update selected user to the newly created one
-                st.session_state.selected_user_id = user_id
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error creating user: {str(e)}")
-    
-    # User selection in sidebar if database is available
-    if st.session_state.db_initialized:
-        try:
-            users = st.session_state.db.get_all_users()
-            
-            # User dropdown
-            user_options = {user["id"]: f"{user['username']} ({user['email']})" for user in users}
-            selected_user = st.sidebar.selectbox(
-                "Select User",
-                options=list(user_options.keys()),
-                format_func=lambda x: user_options[x] if x in user_options else "Select a user",
-                key="user_selector",
-                index=0 if st.session_state.selected_user_id in user_options else None
-            )
-            
-            # Handle user selection change
-            if selected_user != st.session_state.selected_user_id:
-                st.session_state.selected_user_id = selected_user
-                if load_user_data(selected_user):
-                    st.rerun()
-            
-            # Display the user's health data profile in the sidebar when a user is selected
-            if st.session_state.selected_user_id:
-                display_health_data_profile(st.session_state.coach)
-                
-        except Exception as e:
-            st.sidebar.error(f"Error loading users: {e}")
-            if st.sidebar.button("Retry Loading Users"):
-                st.rerun()
-    else:
-        st.sidebar.warning("Database not initialized. Using manual data entry mode.")
-        
-        # Define db_path here so it's available in the button callback
-        db_path = "data/test_database.db"
-        
-        # Add a button to initialize the database directly
-        if st.sidebar.button("Generate Test Database"):
-            try:
-                # Ensure the data directory exists
-                os.makedirs(os.path.dirname(db_path), exist_ok=True)
-                
-                # Initialize the database
-                init_database(db_path)
-                
-                # Connect to the database and verify it has users
-                st.session_state.db = DatabaseConnector(db_path)
-                users = st.session_state.db.get_all_users()
-                
-                if users:
-                    st.session_state.db_initialized = True
-                    print("Test database generated successfully")  # Use print instead of st.toast for initialization
-                    st.sidebar.success(f"Test database generated successfully with {len(users)} sample users!")
-                    st.rerun()
-                else:
-                    print("Database generated but no users found")  # Use print instead of st.error for initialization
-                    st.sidebar.error("Database generated but no users found")
-            except Exception as e:
-                print(f"Error generating test database: {e}")  # Use print instead of st.error for initialization
-                st.sidebar.error("Failed to generate test database")
-                # Try to clean up if database creation failed
-                try:
-                    if os.path.exists(db_path):
-                        os.remove(db_path)
-                        print("Cleaned up failed database file")  # Use print instead of st.info for cleanup completion
-                except:
-                    pass
-    
-    # Main content area
-    st.title("Bio Age Coach")
-    
-    # Show completeness indicators and daily health dashboard when a user is selected
-    if st.session_state.db_initialized and st.session_state.selected_user_id:
-        show_completeness_indicators()
-        show_daily_health_dashboard(st.session_state.selected_user_id)
-    
-    # Only show the data entry form if:
-    # 1. There's no database initialized, OR
-    # 2. No user is selected
-    if not st.session_state.db_initialized or not st.session_state.selected_user_id:
-        # Category selector
-        st.header("Enter Your Health Data")
-        
-        selected_category = st.selectbox(
-            "Select data category",
-            options=list(st.session_state.category_options.keys()),
-            format_func=lambda x: st.session_state.category_options[x],
-            key="category_selector",
-            index=list(st.session_state.category_options.keys()).index(st.session_state.current_category)
+    # Update each user's data and initialize bio age score server
+    for user in test_users:
+        # Get metrics data from health server
+        metrics_response = await mcp_client.send_request(
+            "health",
+            {
+                "type": "metrics",
+                "timeframe": "30D"
+            }
         )
         
-        # Update current category in session state
-        if selected_category != st.session_state.current_category:
-            st.session_state.current_category = selected_category
+        if "error" not in metrics_response:
+            # Initialize bio age score server with the health data
+            await bio_age_score_server.initialize_data({
+                "user_id": user["id"],
+                "health_data": metrics_response.get("metrics", [])
+            })
+
+    # Create agents for the semantic router
+    agents = create_agents(api_key, mcp_client)
+    
+    # Create semantic router with agents
+    semantic_router = SemanticRouter(api_key=api_key, agents=agents)
+    
+    # Create router adapter with semantic router
+    router_adapter = RouterAdapter(
+        semantic_router=semantic_router,
+        mcp_client=mcp_client
+    )
+
+    return mcp_client, router_adapter
+
+def initialize_session_state():
+    """Initialize session state variables."""
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "coach" not in st.session_state:
+        st.session_state.coach = None
+    if "mcp_client" not in st.session_state:
+        st.session_state.mcp_client = None
+    if "router_adapter" not in st.session_state:
+        st.session_state.router_adapter = None
+    if "selected_user_id" not in st.session_state:
+        st.session_state.selected_user_id = None
+    if "user_data_loaded" not in st.session_state:
+        st.session_state.user_data_loaded = False
+    if "conversation_history" not in st.session_state:
+        st.session_state.conversation_history = []
+    if "current_topic" not in st.session_state:
+        st.session_state.current_topic = None
+    if "active_context" not in st.session_state:
+        st.session_state.active_context = {"active_topic": None, "observation_contexts": {}}
+
+async def load_user_data(user_id: str, mcp_client: MultiServerMCPClient) -> bool:
+    """Load user data from HealthServer."""
+    try:
+        # Get metrics data from health server
+        metrics_response = await mcp_client.send_request(
+            "health",
+            {
+                "type": "metrics",
+                "timeframe": "30D"
+            }
+        )
+
+        if "error" in metrics_response:
+            st.error(f"Error loading metrics data: {metrics_response['error']}")
+            return False
+
+        # Update session state with user data
+        st.session_state.user_data = {
+            "metrics": metrics_response.get("metrics", []),
+            "workouts": metrics_response.get("workouts", [])
+        }
+        st.session_state.user_data_loaded = True
+
+        # Update bio age score server with the metrics data
+        await mcp_client.send_request(
+            "bio_age_score",
+            {
+                "type": "initialize",
+                "data": {
+                    "user_id": user_id,
+                    "health_data": metrics_response.get("metrics", [])
+                }
+            }
+        )
+
+        # Update the coach's user data
+        if st.session_state.coach:
+            st.session_state.coach.update_user_data({
+                "health_data": metrics_response.get("metrics", []),
+                "workouts": metrics_response.get("workouts", [])
+            })
+
+        return True
+
+    except Exception as e:
+        st.error(f"Error loading user data: {str(e)}")
+        return False
+
+async def get_daily_health_summary(user_id: str, mcp_client: MultiServerMCPClient) -> dict:
+    """Get a summary of daily health metrics."""
+    try:
+        # Get metrics data
+        response = await mcp_client.send_request(
+            "health",
+            {
+                "type": "metrics",
+                "timeframe": "30D",
+                "api_key": os.getenv("OPENAI_API_KEY")
+            }
+        )
         
-        # Create a form for the selected category
-        with st.form(key=f"{selected_category}_form"):
-            st.subheader(f"Enter {st.session_state.category_options[selected_category]} Values:")
+        if "error" in response:
+            return None
             
-            category_data = st.session_state.coach.biomarkers["categories"][selected_category]
-            item_inputs = {}
+        metrics = response.get("metrics", [])
+        if not metrics:
+            return None
             
-            for item in category_data.get("items", []):
-                # Check if there's already a value in user_data
-                current_value = 0
-                if item["id"] in st.session_state.coach.user_data[selected_category]:
-                    current_value = st.session_state.coach.user_data[selected_category][item["id"]]
-                
-                item_inputs[item["id"]] = st.number_input(
-                    f"{item['name']} ({item.get('unit', '')})",
-                    min_value=0.0,
-                    value=float(current_value) if current_value else 0.0,
-                    help=item.get("description", ""),
-                    key=f"input_{selected_category}_{item['id']}"
-                )
-            
-            submit_button = st.form_submit_button(f"Add {st.session_state.category_options[selected_category]} to Chat")
-            
-            if submit_button:
-                data_message = f"Here are my {st.session_state.category_options[selected_category].lower()} values:\n"
-                values_added = False
-                
-                for item_id, value in item_inputs.items():
-                    if value > 0:  # Only include items with values
-                        for item in category_data.get("items", []):
-                            if item["id"] == item_id:
-                                data_message += f"- {item['name']}: {value} {item.get('unit', '')}\n"
-                                # Update the coach's user_data
-                                st.session_state.coach.user_data[selected_category][item_id] = value
-                                values_added = True
-                                break
-                
-                if values_added:
-                    st.session_state.messages.append({"role": "user", "content": data_message})
-                else:
-                    st.warning(f"Please enter at least one {st.session_state.category_options[selected_category].lower()} value")
+        # Get the most recent date's data
+        latest_metrics = metrics[-1]  # Assuming metrics are sorted by date
+        
+        return {
+            "avg_calories": latest_metrics.get("active_calories", 0),
+            "avg_steps": latest_metrics.get("steps", 0),
+            "avg_sleep": latest_metrics.get("sleep_hours", 0),
+            "avg_score": latest_metrics.get("health_score", 0),
+            "days": 1  # For now, just showing the most recent day
+        }
+    except Exception as e:
+        st.error(f"Error getting daily health summary: {str(e)}")
+        return None
+
+def create_visualization(viz_data, viz_type="line"):
+    """Create a visualization based on the data and type.
     
-    # Chat interface
-    st.header("Chat with Your Biological Age Coach")
+    Args:
+        viz_data: The visualization data
+        viz_type: The type of visualization to create (line, bar, radar, heatmap)
+        
+    Returns:
+        matplotlib.figure.Figure: The created figure
+    """
+    if not viz_data:
+        return None
+        
+    # Set the style for all plots
+    sns.set_style("whitegrid")
+    plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['font.sans-serif'] = ['Arial', 'Helvetica', 'DejaVu Sans']
+    plt.rcParams['axes.edgecolor'] = '#DDDDDD'
+    plt.rcParams['axes.linewidth'] = 0.8
+    plt.rcParams['xtick.color'] = '#555555'
+    plt.rcParams['ytick.color'] = '#555555'
     
-    # Display messages
-    for message in st.session_state.messages:
-        if message["role"] != "system":  # Don't display system messages
+    # Create a new figure with a unique identifier
+    fig = plt.figure(figsize=(12, 6))
+    
+    try:
+        # Create figure based on visualization type
+        if viz_type == "line" and "dates" in viz_data and "scores" in viz_data:
+            # Line chart for time series data
+            
+            # Plot the main line with a gradient color
+            cm = LinearSegmentedColormap.from_list('bio_age', ['#4CAF50', '#2196F3', '#9C27B0'], N=256)
+            points = np.array([viz_data["dates"], viz_data["scores"]]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            
+            # Create a line collection
+            from matplotlib.collections import LineCollection
+            lc = LineCollection(segments, cmap=cm, linewidth=3)
+            lc.set_array(np.linspace(0, 1, len(viz_data["scores"])))
+            
+            ax = plt.gca()
+            ax.add_collection(lc)
+            
+            # Add markers for each data point
+            plt.scatter(viz_data["dates"], viz_data["scores"], c=np.linspace(0, 1, len(viz_data["scores"])), 
+                       cmap=cm, s=80, zorder=3, edgecolor='white', linewidth=1.5)
+            
+            # Add reference ranges
+            if "reference_ranges" in viz_data:
+                plt.fill_between(viz_data["dates"], 
+                              viz_data["reference_ranges"]["optimal_min"],
+                              viz_data["reference_ranges"]["optimal_max"],
+                              alpha=0.15, color='green', label='Optimal Range')
+                plt.fill_between(viz_data["dates"],
+                              viz_data["reference_ranges"]["good_min"],
+                              viz_data["reference_ranges"]["good_max"],
+                              alpha=0.1, color='orange', label='Good Range')
+            
+            # Add trend line
+            if len(viz_data["scores"]) > 2:
+                z = np.polyfit(range(len(viz_data["dates"])), viz_data["scores"], 1)
+                p = np.poly1d(z)
+                plt.plot(viz_data["dates"], p(range(len(viz_data["dates"]))), 
+                       "r--", alpha=0.7, linewidth=1.5, label="Trend")
+            
+            # Set labels and title
+            plt.xlabel("Date", fontsize=12, color="#333333")
+            plt.ylabel("Score", fontsize=12, color="#333333")
+            plt.title("Bio Age Score Trends", fontsize=16, color="#333333", fontweight='bold')
+            
+            # Customize x-axis
+            plt.xticks(rotation=45, ha='right')
+            
+            # Add grid
+            plt.grid(True, linestyle='--', alpha=0.7)
+            
+            # Add legend
+            plt.legend(loc='upper left', frameon=True, framealpha=0.9)
+            
+        elif viz_type == "bar" and "categories" in viz_data and "values" in viz_data:
+            # Bar chart for categorical data
+            
+            # Create a custom colormap
+            colors = sns.color_palette("viridis", len(viz_data["categories"]))
+            
+            # Create the bar chart
+            bars = plt.bar(viz_data["categories"], viz_data["values"], color=colors)
+            
+            # Add value labels on top of bars
+            for bar in bars:
+                height = bar.get_height()
+                plt.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                       f'{height:.1f}', ha='center', va='bottom', fontsize=10)
+            
+            # Set labels and title
+            plt.xlabel(viz_data.get("x_label", "Categories"), fontsize=12, color="#333333")
+            plt.ylabel(viz_data.get("y_label", "Values"), fontsize=12, color="#333333")
+            plt.title(viz_data.get("title", "Bar Chart"), fontsize=16, color="#333333", fontweight='bold')
+            
+            # Add reference line if provided
+            if "reference_line" in viz_data:
+                plt.axhline(y=viz_data["reference_line"], color='r', linestyle='--', 
+                          alpha=0.7, label=viz_data.get("reference_label", "Reference"))
+                plt.legend()
+            
+        elif viz_type == "radar" and "categories" in viz_data and "values" in viz_data:
+            # Radar chart for multi-dimensional data
+            
+            # Create radar chart
+            categories = viz_data["categories"]
+            values = viz_data["values"]
+            
+            # Close the loop for the radar chart
+            categories = np.concatenate((categories, [categories[0]]))
+            values = np.concatenate((values, [values[0]]))
+            
+            # Calculate angles for each category
+            angles = np.linspace(0, 2*np.pi, len(categories), endpoint=False).tolist()
+            angles += angles[:1]  # Close the loop
+            
+            # Create subplot with polar projection
+            ax = fig.add_subplot(111, polar=True)
+            
+            # Plot data
+            ax.plot(angles, values, 'o-', linewidth=2, label=viz_data.get("label", "Data"))
+            ax.fill(angles, values, alpha=0.25)
+            
+            # Set category labels
+            ax.set_xticks(angles[:-1])
+            ax.set_xticklabels(categories[:-1])
+            
+            # Set y-axis limits if provided
+            if "y_limits" in viz_data:
+                ax.set_ylim(viz_data["y_limits"])
+            
+            # Add title
+            plt.title(viz_data.get("title", "Radar Chart"), fontsize=16, color="#333333", fontweight='bold')
+            
+            # Add reference values if provided
+            if "reference_values" in viz_data:
+                ref_values = viz_data["reference_values"]
+                ref_values = np.concatenate((ref_values, [ref_values[0]]))  # Close the loop
+                ax.plot(angles, ref_values, 'o-', linewidth=2, alpha=0.7, 
+                      label=viz_data.get("reference_label", "Reference"))
+                ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
+            
+        elif viz_type == "heatmap" and "data_matrix" in viz_data:
+            # Heatmap for matrix data
+            
+            # Create heatmap
+            sns.heatmap(viz_data["data_matrix"], 
+                      annot=viz_data.get("show_values", True),
+                      cmap=viz_data.get("colormap", "viridis"),
+                      linewidths=0.5,
+                      xticklabels=viz_data.get("x_labels", True),
+                      yticklabels=viz_data.get("y_labels", True),
+                      cbar_kws={'label': viz_data.get("colorbar_label", "Value")})
+            
+            # Set title
+            plt.title(viz_data.get("title", "Heatmap"), fontsize=16, color="#333333", fontweight='bold')
+            
+        else:
+            # Default to a simple line chart if the data doesn't match any specific type
+            
+            # Try to plot whatever data is available
+            if "x" in viz_data and "y" in viz_data:
+                plt.plot(viz_data["x"], viz_data["y"])
+                plt.xlabel(viz_data.get("x_label", "X"))
+                plt.ylabel(viz_data.get("y_label", "Y"))
+                plt.title(viz_data.get("title", "Chart"))
+            else:
+                # Create an empty chart with a message
+                plt.text(0.5, 0.5, "No visualization data available", 
+                       horizontalalignment='center', verticalalignment='center',
+                       transform=plt.gca().transAxes, fontsize=14)
+                plt.axis('off')
+        
+        # Adjust layout for all plot types
+        plt.tight_layout()
+        
+        return fig
+    except Exception as e:
+        print(f"Error creating visualization: {e}")
+        # Create a simple error message plot
+        plt.clf()  # Clear the figure
+        plt.text(0.5, 0.5, f"Error creating visualization: {str(e)}", 
+               horizontalalignment='center', verticalalignment='center',
+               transform=plt.gca().transAxes, fontsize=12, color='red')
+        plt.axis('off')
+        return fig
+
+def update_session_context():
+    """Update the session state with the latest observation context from the coach."""
+    if "coach" in st.session_state and st.session_state.coach:
+        # Get the active context from the coach
+        active_context = st.session_state.coach.get_active_context()
+        
+        # Determine the active topic based on the highest relevancy observation context
+        observation_contexts = active_context.get('observation_contexts', {})
+        if observation_contexts:
+            # Find the observation context with the highest relevancy score
+            highest_relevancy = 0.0
+            highest_context = None
+            for agent_name, context in observation_contexts.items():
+                relevancy = context.get('relevancy_score', 0.0)
+                if relevancy > highest_relevancy:
+                    highest_relevancy = relevancy
+                    highest_context = context
+            
+            # Set the active topic based on the highest relevancy context
+            if highest_context and highest_relevancy >= 0.4:  # Only set if relevancy is significant
+                data_type = highest_context.get('data_type', 'unknown')
+                active_context['active_topic'] = data_type.capitalize()
+        
+        # Update the session state with the modified active context
+        st.session_state.active_context = active_context
+        print(f"Updated session context: {st.session_state.active_context}")
+
+async def main():
+    """Main function for the Streamlit app."""
+    st.title("Bio Age Coach")
+    
+    # Initialize session state
+    initialize_session_state()
+    
+    # Initialize MCP servers if not already done
+    if not st.session_state.mcp_client or not st.session_state.router_adapter:
+        mcp_client, router_adapter = await init_mcp_servers()
+        st.session_state.mcp_client = mcp_client
+        st.session_state.router_adapter = router_adapter
+        st.session_state.coach = await BioAgeCoach.create(mcp_client, router_adapter)
+    
+    # User selection in sidebar
+    with st.sidebar:
+        st.header("User Selection")
+        
+        # Simplified user selection with test user
+        user_options = {
+            "Test User 1": "test_user_1"
+        }
+        
+        selected_user = st.selectbox(
+            "Select User",
+            options=list(user_options.keys()),
+            key="user_selector"
+        )
+        
+        selected_user_id = user_options[selected_user]
+        
+        # Load user data if user changed
+        if st.session_state.selected_user_id != selected_user_id:
+            st.session_state.selected_user_id = selected_user_id
+            st.session_state.user_data_loaded = False
+            st.session_state.messages = []
+            
+        # Load user data if not loaded
+        if not st.session_state.user_data_loaded:
+            with st.spinner("Loading user data..."):
+                if await load_user_data(selected_user_id, st.session_state.mcp_client):
+                    st.success("Data loaded successfully!")
+                    
+                    # Initialize the coach with the loaded data
+                    if "user_data" in st.session_state:
+                        st.session_state.coach.update_user_data(st.session_state.user_data)
+                        
+                        # Add welcome message
+                        welcome_message = f"👋 Hello! I've loaded your health data. Let me help you understand and optimize your biological age."
+                        st.session_state.messages.append({"role": "assistant", "content": welcome_message})
+        
+        # File upload section in sidebar
+        st.header("Upload Health Data")
+        uploaded_file = st.file_uploader("Upload health data (CSV)", type=["csv"], key="sidebar_file_uploader", help="Upload CSV files with health data")
+        
+        # Process uploaded file if any
+        if uploaded_file is not None and "last_uploaded_file" not in st.session_state:
+            st.session_state.last_uploaded_file = uploaded_file.name
+            with st.spinner("Processing your data..."):
+                try:
+                    import pandas as pd
+                    
+                    # Read the CSV data
+                    df = pd.read_csv(uploaded_file)
+                    
+                    # Automatically detect data type based on columns
+                    data_type = "unknown"
+                    columns = set(df.columns.str.lower())
+                    
+                    if {"sleep_hours", "deep_sleep", "rem_sleep", "light_sleep"}.intersection(columns):
+                        data_type = "sleep"
+                    elif {"steps", "active_calories", "exercise_minutes"}.intersection(columns):
+                        data_type = "exercise"
+                    elif {"calories", "protein", "carbs", "fats"}.intersection(columns):
+                        data_type = "nutrition"
+                    elif {"weight", "systolic", "diastolic", "body_fat_percentage"}.intersection(columns):
+                        data_type = "biometric"
+                    
+                    # Convert DataFrame to dictionary format expected by the router
+                    data_dict = {
+                        f"{data_type}_data": df.to_dict(orient="records")
+                    }
+                    
+                    # Create a prompt about the uploaded data
+                    file_name = uploaded_file.name
+                    data_prompt = f"I've just uploaded my health data file '{file_name}'. Can you analyze it and give me insights?"
+                    
+                    # Add user message
+                    st.session_state.messages.append({"role": "user", "content": data_prompt})
+                    
+                    # Process the data upload with the coach
+                    response = await st.session_state.coach.handle_data_upload(data_type, data_dict)
+                    
+                    # Force update of the active context in session state
+                    update_session_context()
+                    
+                    # Ensure we have a valid response
+                    if response is None:
+                        response = {
+                            "response": f"I've processed your {data_type} data and created an observation context. You can now ask me questions about your {data_type} data.",
+                            "insights": [f"Successfully processed {data_type} data from {file_name}"]
+                        }
+                    elif isinstance(response, str):
+                        # Convert string response to dict format
+                        response = {
+                            "response": response,
+                            "insights": [f"Successfully processed {data_type} data from {file_name}"]
+                        }
+                    elif isinstance(response, dict) and "response" not in response:
+                        # Add a default response if missing
+                        response["response"] = f"I've processed your {data_type} data and created an observation context. You can now ask me questions about your {data_type} data."
+                        if "insights" not in response:
+                            response["insights"] = [f"Successfully processed {data_type} data from {file_name}"]
+                    
+                    # Log the response for debugging
+                    print(f"UI Response to display: {response}")
+                    
+                    # Create a clean copy of the response for the session state
+                    # This ensures we don't have any None values that might be displayed
+                    clean_response = {
+                        "response": response.get("response", f"I've processed your {data_type} data and created an observation context."),
+                        "insights": response.get("insights", [f"Successfully processed {data_type} data from {file_name}"]),
+                        "visualization": response.get("visualization", None),
+                        "error": response.get("error", None)
+                    }
+                    
+                    # Add assistant response to session state with the clean response
+                    st.session_state.messages.append({"role": "assistant", "content": clean_response})
+                    
+                    # Success message
+                    st.success(f"Successfully processed your {data_type} data!")
+                    
+                except Exception as e:
+                    st.error(f"Error processing data: {str(e)}")
+                    print(f"Data processing error: {str(e)}")
+                    
+                # Force a rerun to update the display
+                st.rerun()
+        
+        # Reset the last uploaded file if a new file is uploaded
+        if uploaded_file is not None and "last_uploaded_file" in st.session_state:
+            if uploaded_file.name != st.session_state.last_uploaded_file:
+                del st.session_state.last_uploaded_file
+                st.rerun()
+        
+        # Display current context
+        if st.session_state.user_data_loaded and st.session_state.coach:
+            st.header("Current Context")
+            
+            # Get active context from session state
+            active_context = st.session_state.active_context
+            
+            # Display active topic
+            active_topic = active_context.get('active_topic')
+            if active_topic:
+                st.info(f"Active Topic: {active_topic}")
+            else:
+                st.info("Active Topic: General")
+            
+            # Display observation contexts
+            observation_contexts = active_context.get('observation_contexts', {})
+            if observation_contexts:
+                st.subheader("Observation Contexts")
+                for agent_name, context in observation_contexts.items():
+                    data_type = context.get('data_type', 'unknown')
+                    relevancy = context.get('relevancy_score', 0.0)
+                    confidence = context.get('confidence_score', 0.0)
+                    
+                    # Create a colored indicator based on relevancy score
+                    if relevancy > 0.7:
+                        color = "🟢"  # High relevancy
+                    elif relevancy > 0.4:
+                        color = "🟡"  # Medium relevancy
+                    else:
+                        color = "⚪"  # Low relevancy
+                    
+                    st.markdown(f"{color} **{data_type.capitalize()}** (Agent: {agent_name})")
+                    st.progress(relevancy)
+                    st.caption(f"Relevancy: {relevancy:.2f} | Confidence: {confidence:.2f}")
+            else:
+                st.caption("No active observation contexts")
+
+    # Main content area
+    if st.session_state.user_data_loaded:
+        # Display health summary
+        if st.session_state.selected_user_id:
+            summary = await get_daily_health_summary(
+                st.session_state.selected_user_id,
+                st.session_state.mcp_client
+            )
+            if summary:
+                st.header("Current Health Metrics")
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Active Calories", f"{summary['avg_calories']}")
+                with col2:
+                    st.metric("Steps", f"{int(summary['avg_steps']):,}")
+                with col3:
+                    st.metric("Sleep (hrs)", f"{summary['avg_sleep']}")
+                with col4:
+                    st.metric("Health Score", f"{summary['avg_score']}/100")
+        
+        # Chat interface
+        st.header("Chat with Your Coach")
+        
+        # Display messages
+        for message in st.session_state.messages:
             with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-    
-    # Get user input
-    user_input = st.chat_input("Type your message here...")
-    if user_input:
-        # Add user message to chat
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.markdown(user_input)
+                if isinstance(message.get("content"), dict):
+                    content = message["content"]
+                    # Debug log the content
+                    print(f"Rendering message content: {content}")
+                    
+                    # Handle error if present
+                    if "error" in content and content["error"]:
+                        st.error(content["error"])
+                        continue
+                    
+                    # Always display response text first if available
+                    if "response" in content and content["response"]:
+                        st.markdown(content["response"])
+                    elif content:
+                        # If no response field but content exists, display a default message
+                        st.markdown("I've processed your data and created an observation context. You can now ask me questions about your data.")
+                    
+                    # Handle visualization if present
+                    if "visualization" in content and content["visualization"]:
+                        try:
+                            viz_data = content["visualization"]
+                            # Determine visualization type
+                            viz_type = "line"  # Default type
+                            if "viz_type" in viz_data:
+                                viz_type = viz_data["viz_type"]
+                            elif "categories" in viz_data and "values" in viz_data:
+                                if len(viz_data["categories"]) > 5:
+                                    viz_type = "bar"
+                                else:
+                                    viz_type = "radar"
+                            elif "data_matrix" in viz_data:
+                                viz_type = "heatmap"
+                            
+                            # Create the visualization
+                            fig = create_visualization(viz_data, viz_type)
+                            if fig:
+                                # Use Streamlit's pyplot function with clear_figure=False to prevent auto-clearing
+                                st.pyplot(fig, clear_figure=False)
+                                # Close the figure to free memory
+                                plt.close(fig)
+                        except Exception as e:
+                            st.error(f"Error displaying visualization: {str(e)}")
+                    
+                    # Display insights if present
+                    if "insights" in content and content["insights"]:
+                        st.markdown("### Key Insights")
+                        for insight in content["insights"]:
+                            st.markdown(f"- {insight}")
+                    
+                    # Display recommendations if present
+                    if "recommendations" in content and content["recommendations"]:
+                        st.markdown("### Recommendations")
+                        for recommendation in content["recommendations"]:
+                            st.markdown(f"- {recommendation}")
+                    
+                    # Display questions if present
+                    if "questions" in content and content["questions"]:
+                        st.markdown("### Questions")
+                        for question in content["questions"]:
+                            st.markdown(f"- {question}")
+                elif message.get("content") is None:
+                    # Handle None content explicitly
+                    st.markdown("I've processed your data and created an observation context. You can now ask me questions about your data.")
+                else:
+                    # Handle string content
+                    st.markdown(message["content"])
         
-        # Get response from coach
-        with st.spinner("Thinking..."):
-            response = st.session_state.coach.get_response(user_input)
+        # Create a more aesthetic chat input with file upload above
+        chat_container = st.container()
         
-        # Add assistant message to chat
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        with st.chat_message("assistant"):
-            st.markdown(response)
+        # Add custom CSS for a more aesthetic input area
+        st.markdown("""
+        <style>
+        .chat-input-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 8px;
+            background-color: #f9f9f9;
+            margin-bottom: 10px;
+        }
+        .file-upload-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .file-upload-icon {
+            color: #555;
+            margin-right: 5px;
+            font-size: 18px;
+        }
+        .file-upload-text {
+            color: #555;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        .send-button {
+            margin-top: 5px;
+            width: 100%;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Chat input below the file upload
+        prompt = st.text_input("Type your message here...", key="chat_prompt")
+        
+        # Add a send button
+        send_button = st.button("Send", key="send_button", help="Send your message", use_container_width=True)
+        
+        # Process user input when send button is clicked
+        if prompt and send_button:
+            # Add user message
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+            
+            # Get assistant response
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking..."):
+                    response = await st.session_state.coach.process_message(prompt)
+                    
+                    # Update the active context in session state
+                    update_session_context()
+                    
+                    # Ensure we have a valid response
+                    if response is None:
+                        response = {
+                            "response": "I processed your message but couldn't generate a specific response. Please try rephrasing your question.",
+                            "insights": []
+                        }
+                    elif isinstance(response, str):
+                        # Convert string response to dict format
+                        response = {
+                            "response": response,
+                            "insights": []
+                        }
+                    elif isinstance(response, dict) and "response" not in response:
+                        # Add a default response if missing
+                        response["response"] = "I processed your message but the response format was unexpected. Please try asking a different question."
+                        if "insights" not in response:
+                            response["insights"] = []
+                    
+                    # Log the response for debugging
+                    print(f"UI Response to display: {response}")
+                    
+                    # Create a clean copy of the response for the session state
+                    # This ensures we don't have any None values that might be displayed
+                    clean_response = {
+                        "response": response.get("response", "I processed your message but couldn't generate a specific response."),
+                        "insights": response.get("insights", []),
+                        "visualization": response.get("visualization", None),
+                        "error": response.get("error", None)
+                    }
+                    
+                    # Add to session state messages with the clean response
+                    st.session_state.messages.append({"role": "assistant", "content": clean_response})
+                    
+                    # Display the response directly (don't rely on the message rendering)
+                    if isinstance(response, dict):
+                        # Always display response text first if available
+                        if "response" in response and response["response"]:
+                            st.markdown(response["response"])
+                        else:
+                            # If no response field, display a default message
+                            st.markdown("I processed your message but couldn't generate a specific response. Please try rephrasing your question.")
+                        
+                        # Handle error if present
+                        if "error" in response and response["error"]:
+                            st.error(response["error"])
+                        
+                        # Handle visualization if present
+                        if "visualization" in response and response["visualization"]:
+                            try:
+                                viz_data = response["visualization"]
+                                # Determine visualization type
+                                viz_type = "line"  # Default type
+                                if "viz_type" in viz_data:
+                                    viz_type = viz_data["viz_type"]
+                                elif "categories" in viz_data and "values" in viz_data:
+                                    if len(viz_data["categories"]) > 5:
+                                        viz_type = "bar"
+                                    else:
+                                        viz_type = "radar"
+                                elif "data_matrix" in viz_data:
+                                    viz_type = "heatmap"
+                                
+                                # Create the visualization
+                                fig = create_visualization(viz_data, viz_type)
+                                if fig:
+                                    # Use Streamlit's pyplot function with clear_figure=False
+                                    st.pyplot(fig, clear_figure=False)
+                                    # Close the figure to free memory
+                                    plt.close(fig)
+                            except Exception as e:
+                                st.error(f"Error displaying visualization: {str(e)}")
+                                print(f"Visualization error: {str(e)}")
+                        
+                        # Display insights if present
+                        if "insights" in response and response["insights"]:
+                            st.markdown("### Key Insights")
+                            for insight in response["insights"]:
+                                st.markdown(f"- {insight}")
+                        
+                        # Display recommendations if present
+                        if "recommendations" in response and response["recommendations"]:
+                            st.markdown("### Recommendations")
+                            for recommendation in response["recommendations"]:
+                                st.markdown(f"- {recommendation}")
+                        
+                        # Display questions if present
+                        if "questions" in response and response["questions"]:
+                            st.markdown("### Questions")
+                            for question in response["questions"]:
+                                st.markdown(f"- {question}")
+                    else:
+                        # If response is not a dict, convert to string and display
+                        st.markdown(str(response))
+            
+            # Force a rerun to update the display
+            st.rerun()
+    else:
+        st.info("Please select a user to begin.")
 
 if __name__ == "__main__":
-    main() 
+    asyncio.run(main()) 

@@ -1,0 +1,28 @@
+{
+    "papers": [
+        {
+            "title": "Grip Strength and Mortality",
+            "findings": [
+                "Strong correlation between grip strength and overall mortality",
+                "Grip strength is a reliable predictor of functional capacity",
+                "Age-specific grip strength standards provide context for assessment"
+            ]
+        },
+        {
+            "title": "Sleep Duration and Biological Aging",
+            "findings": [
+                "Sleep duration affects telomere length",
+                "Optimal sleep (7-9 hours) correlates with slower biological aging",
+                "Poor sleep quality accelerates cellular aging markers"
+            ]
+        },
+        {
+            "title": "HbA1c as Aging Biomarker",
+            "findings": [
+                "HbA1c strongly correlates with biological age acceleration",
+                "Glycation end-products accumulate with aging",
+                "Maintaining HbA1c below 5.7% optimal for longevity"
+            ]
+        }
+    ]
+}

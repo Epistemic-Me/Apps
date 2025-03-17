@@ -1,0 +1,19 @@
+{
+    "user_id": "test_user",
+    "health_data": {
+        "heart_rate": 65,
+        "sleep_hours": 7.5,
+        "active_calories": 450,
+        "steps": 8500,
+        "blood_pressure": {
+            "systolic": 120,
+            "diastolic": 80
+        }
+    },
+    "measurements": {
+        "height": 175,
+        "weight": 70,
+        "body_fat": 15,
+        "waist_to_height": 0.45
+    }
+}
