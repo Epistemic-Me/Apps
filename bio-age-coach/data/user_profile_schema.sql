@@ -23,7 +23,7 @@ CREATE TABLE health_observations (
     FOREIGN KEY (user_id) REFERENCES user_profiles(user_id)
 );
 
--- Coaching sessions
+-- Coaching sessionso
 CREATE TABLE coaching_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT NOT NULL,
