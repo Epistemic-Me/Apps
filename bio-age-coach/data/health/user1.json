@@ -1,0 +1,60 @@
+{
+  "health_data": {
+    "active_calories": 0,
+    "steps": 0,
+    "sleep": 6.5,
+    "resting_heart_rate": 65,
+    "chronological_age": 18,
+    "biological_sex": "male"
+  },
+  "bio_age_tests": {
+    "push_ups": 15,
+    "grip_strength": 90.0,
+    "one_leg_stand": 45
+  },
+  "capabilities": {
+    "plank": 120,
+    "sit_and_reach": 15
+  },
+  "biomarkers": {
+    "hba1c": 5.9,
+    "fasting_glucose": 105,
+    "hdl": 65,
+    "ldl": 100,
+    "triglycerides": 150,
+    "crp": 1.5
+  },
+  "measurements": {
+    "body_fat": 18.5,
+    "waist_circumference": 82,
+    "hip_circumference": 98,
+    "waist_to_hip": 0.84
+  },
+  "daily_metrics": [],
+  "lab_results": {
+    "vitamin_d": 45
+  },
+  "demographics": {
+    "age": 18,
+    "sex": "male",
+    "height": 175,
+    "weight": 70
+  },
+  "health_metrics": {
+    "active_calories": 400,
+    "steps": 8000,
+    "sleep_hours": 6.5,
+    "resting_heart_rate": 65,
+    "blood_pressure": {
+      "systolic": 120,
+      "diastolic": 80
+    }
+  },
+  "fitness_metrics": {
+    "push_ups": 15,
+    "grip_strength": 90.0,
+    "one_leg_stand": 45,
+    "plank": 120,
+    "sit_and_reach": 15
+  }
+}

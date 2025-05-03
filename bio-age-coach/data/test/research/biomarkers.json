@@ -1,0 +1,44 @@
+{
+    "biomarkers": {
+        "hba1c": {
+            "value": 5.4,
+            "unit": "%",
+            "normal_range": {
+                "min": 4.0,
+                "max": 5.7,
+                "optimal": 5.0
+            },
+            "impact": "Strong indicator of long-term blood sugar control and metabolic health"
+        },
+        "fasting_glucose": {
+            "value": 85,
+            "unit": "mg/dL",
+            "normal_range": {
+                "min": 70,
+                "max": 100,
+                "optimal": 85
+            },
+            "impact": "Key marker of current metabolic health and insulin sensitivity"
+        },
+        "crp": {
+            "value": 1.2,
+            "unit": "mg/L",
+            "normal_range": {
+                "min": 0,
+                "max": 3.0,
+                "optimal": "<1.0"
+            },
+            "impact": "Marker of systemic inflammation and cardiovascular health"
+        }
+    },
+    "papers": [
+        {
+            "title": "Biomarkers of Aging and Disease",
+            "key_findings": [
+                "HbA1c is strongly correlated with biological age",
+                "Inflammatory markers like CRP can indicate accelerated aging",
+                "Metabolic health markers are key predictors of longevity"
+            ]
+        }
+    ]
+} 

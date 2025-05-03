@@ -1,0 +1,39 @@
+{
+    "tools": [
+        "biological_age",
+        "health_score",
+        "fitness_metrics",
+        "analyze"
+    ],
+    "fitness_metrics": {
+        "capabilities": {
+            "push_ups": 20,
+            "grip_strength": 45,
+            "one_leg_stand": 25,
+            "vo2_max": 42
+        },
+        "reference_ranges": {
+            "push_ups": {
+                "male": {
+                    "18-20": {
+                        "poor": "<10",
+                        "below_average": "11-14",
+                        "average": "15-20",
+                        "above_average": "21-25",
+                        "excellent": ">25"
+                    }
+                }
+            },
+            "grip_strength": {
+                "male": {
+                    "18-20": {
+                        "poor": "<30",
+                        "average": "30-50",
+                        "excellent": ">70"
+                    }
+                }
+            }
+        }
+    },
+    "tool_name": "fitness_assessment"
+}

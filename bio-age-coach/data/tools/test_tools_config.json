@@ -1,0 +1,35 @@
+{
+  "fitness_metrics": {
+    "push_ups": {
+      "age_ranges": {
+        "18-20": {
+          "poor": {"min": 0, "max": 10},
+          "below_average": {"min": 11, "max": 14},
+          "average": {"min": 15, "max": 20},
+          "above_average": {"min": 21, "max": 25},
+          "excellent": {"min": 26, "max": null}
+        }
+      }
+    },
+    "grip_strength": {
+      "age_ranges": {
+        "18-20": {
+          "poor": {"min": 0, "max": 30},
+          "average": {"min": 31, "max": 50},
+          "above_average": {"min": 51, "max": 70},
+          "excellent": {"min": 71, "max": null}
+        }
+      }
+    },
+    "vo2_max": {
+      "age_ranges": {
+        "18-20": {
+          "poor": {"min": 0, "max": 35},
+          "fair": {"min": 36, "max": 42},
+          "good": {"min": 43, "max": 52},
+          "excellent": {"min": 53, "max": null}
+        }
+      }
+    }
+  }
+} 

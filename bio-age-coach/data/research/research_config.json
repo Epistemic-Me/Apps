@@ -1,0 +1,19 @@
+{
+    "papers": [
+        {
+            "id": "paper1",
+            "title": "Exercise and Longevity",
+            "abstract": "Study on effects of exercise on longevity.",
+            "keywords": [
+                "exercise",
+                "longevity",
+                "health"
+            ],
+            "year": 2023,
+            "authors": [
+                "Smith, J.",
+                "Jones, K."
+            ]
+        }
+    ]
+}

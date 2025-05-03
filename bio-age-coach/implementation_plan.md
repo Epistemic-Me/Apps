@@ -1,9 +1,11 @@
-# Bio-Age Coach Implementation Plan (Revised)
-****
-## Overview
-This plan outlines our implementation of the Bio-Age Coach application for biological age assessment and recommendations. We've completed the initial version and are now focusing on enhancing it with database integration for existing user health data and more sophisticated prompts and evaluations.
+# Bio-Age Coach Implementation Plan (Updated with MCP Integration)
 
-## 1. Project Setup ✅
+## Overview
+This plan outlines the integration of MCP servers into our existing Bio-Age Coach application. The update focuses on modularizing our data handling into three distinct MCP servers while maintaining and enhancing our current functionality.
+
+## Part 1: Completed Tasks ✅
+
+### 1. Project Setup ✅
 - [x] Create basic directory structure
 - [x] Set up virtual environment
 - [x] Install required packages
@@ -17,7 +19,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## 2. Data Model Implementation ✅
+### 2. Data Model Implementation ✅
 - [x] Define biomarker schema with multiple categories
 - [x] Create comprehensive biomarker datasets
 - [x] Implement health data categorization system
@@ -27,7 +29,7 @@ Key files:
 1. `data/biomarkers.json` - Biomarker definitions across six categories
 2. `data/protocols.json` - Protocols and recommendations for improving biomarkers
 
-## 3. Chatbot Core Implementation ✅
+### 3. Chatbot Core Implementation ✅
 - [x] Create conversation flow system
 - [x] Define prompt templates for different conversation stages
 - [x] Implement biomarker analysis logic
@@ -38,282 +40,369 @@ Key components:
 - `src/chatbot/coach.py` - Main chatbot logic with BioAgeCoach class
 - `src/chatbot/prompts.py` - System prompts and templates for different coaching scenarios
 
-## 4. UI Implementation ✅
+### 4. UI Implementation ✅
 - [x] Create Streamlit application
 - [x] Implement chat interface
 - [x] Add category-based biomarker input forms
 - [x] Implement results display
 - [x] Add data completeness visualizations (progress bars and radar chart)
 
-## 5. Evaluation Framework ✅
+### 5. Evaluation Framework ✅
 - [x] Create test cases for different coach capabilities
 - [x] Implement evaluation metrics (AnswerRelevancyMetric)
 - [x] Run initial evaluation
 - [x] Enable Confident AI integration
 
-## 6. Documentation and Deployment ✅
+### 6. Documentation and Deployment ✅
 - [x] Create comprehensive README
 - [x] Document setup and usage instructions
 - [x] Outline development roadmap
 - [x] Initial deployment and testing
 
-## 7. Database Integration for User Health Data 🔄
-- [ ] Implement database connection and queries for user health data
-- [ ] Create data mapper to transform database records to coach's data model
-- [ ] Build initialization flow to load user data when starting a conversation
-- [ ] Implement data completeness assessment for existing user data
-- [ ] Develop intelligent prompting for missing high-value measurements
+## Part 2: MCP Integration (Current Focus) 🔄
 
+### 7. Project Structure Update ✅
+```
+bio-age-coach/
+├── app.py                 # Main Streamlit app
+├── requirements.txt       # Updated with MCP dependencies
+├── .env                  # Environment variables
+├── data/                 # Data directory
+│   ├── test_health_data/ # Test health data files
+│   ├── biomarkers.json   # Biomarker definitions
+│   ├── protocols.json    # Health protocols
+│   └── test_database.db  # SQLite database
+├── src/
+│   ├── bio_age_coach/    # Main package directory
+│   │   ├── __init__.py
+│   │   ├── chatbot/     # Chatbot logic
+│   │   │   ├── __init__.py
+│   │   │   ├── coach.py
+│   │   │   └── prompts.py
+│   │   └── mcp/        # MCP implementations
+│   │       ├── __init__.py
+│   │       ├── base.py
+│   │       ├── health_server.py
+│   │       ├── research_server.py
+│   │       ├── tools_server.py
+│   │       ├── client.py
+│   │       └── router.py
+│   └── evaluations/     # Evaluation framework
+│       ├── __init__.py
+│       └── chatbot_eval.py
+└── tests/              # Test suite
+    ├── __init__.py
+    ├── test_chatbot/
+    ├── test_mcp/
+    └── test_evaluations/
+
+### 8. MCP Server Implementation ✅
+
+#### 8.1 Base MCP Server (`src/mcp/base.py`)
 ```python
-# Example of database integration flow
-def initialize_coach_with_user_data(user_id):
-    # Get user data from database
-    user_data = db.get_user_health_data(user_id)
-    
-    # Initialize coach with existing data
-    coach = BioAgeCoach()
-    
-    # Map database fields to coach's data model
-    for record in user_data:
-        category = map_to_category(record.type)
-        item_id = map_to_item_id(record.name)
-        value = record.value
+from typing import Dict, Any
+import asyncio
+from mcp import MCPServer
+
+class BaseMCPServer(MCPServer):
+    def __init__(self, api_key: str):
+        super().__init__()
+        self.api_key = api_key
         
-        coach.user_data[category][item_id] = value
+    async def authenticate(self, request: Dict[str, Any]) -> bool:
+        return request.get("api_key") == self.api_key
+        
+    async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        if not await self.authenticate(request):
+            return {"error": "Authentication failed"}
+        return await self._process_request(request)
     
-    # Assess what data is available and what's missing
-    completeness = coach.calculate_overall_completeness()
-    missing_high_value = coach.suggest_next_measurements(limit=5)
-    
-    return coach, completeness, missing_high_value
+    async def _process_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        raise NotImplementedError
 ```
 
-## 8. Prompt Engineering Evolution 🔄
-- [ ] Analyze conversation logs to identify improvement areas
-- [ ] Create specialized prompt templates for data patterns
-- [ ] Implement A/B testing framework for prompt variations
-- [ ] Design prompts for different user personas (beginners, advanced users)
-- [ ] Create context-aware prompting based on user data completeness
-
-### 8.1 Initial Assessment Prompts
-- [ ] Develop system prompt that emphasizes existing data assessment
-- [ ] Create data summary prompt for presenting user's current health data
-- [ ] Design gap analysis prompt to identify and explain missing high-value data
-- [ ] Build measurement suggestion prompts with clear value propositions
-- [ ] Implement progressive disclosure prompts to avoid overwhelming users
-
+#### 8.2 Health Server (`src/mcp/health_server.py`)
 ```python
-# Example of data assessment prompt structure
-DATA_ASSESSMENT_PROMPT = """
-I see you have {completeness_percentage}% of your health profile complete. 
-Let me summarize what I already know about your health data:
+import pandas as pd
+from typing import Dict, Any
+from .base import BaseMCPServer
 
-{existing_data_summary}
-
-To give you a more accurate assessment of your biological age, it would be valuable to know more about:
-
-{missing_high_value_data}
-
-Would you like to provide any of this additional information? Or would you prefer me to analyze what we currently have?
-"""
-
-# Example of progressive data collection in conversation
-def create_data_collection_prompts(coach):
-    """Create prompts for progressive data collection based on current completeness."""
-    completeness = coach.calculate_overall_completeness()
-    
-    if completeness < 0.2:
-        # Very limited data - focus on getting critical measurements first
-        return CRITICAL_DATA_PROMPT
-    elif completeness < 0.5:
-        # Some data - target high-impact gaps
-        return HIGH_IMPACT_GAPS_PROMPT
-    elif completeness < 0.8:
-        # Good data - suggest refinements
-        return REFINEMENT_DATA_PROMPT
-    else:
-        # Excellent data - focus on analysis
-        return COMPREHENSIVE_ANALYSIS_PROMPT
+class HealthServer(BaseMCPServer):
+    def __init__(self, api_key: str, health_data_path: str):
+        super().__init__(api_key)
+        self.health_data_path = health_data_path
+        self.health_data = None
+        
+    async def _load_health_data(self):
+        if self.health_data is None:
+            self.health_data = pd.read_csv(self.health_data_path)
+            
+    async def _process_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        await self._load_health_data()
+        query_type = request.get("type")
+        
+        if query_type == "metrics":
+            return await self._get_health_metrics()
+        elif query_type == "trends":
+            return await self._get_health_trends()
+        
+        return {"error": "Invalid query type"}
 ```
 
-### 8.2 Persona-Based Prompts
-- [ ] Create beginner-friendly prompts with more explanation of terms
-- [ ] Design intermediate prompts with balanced detail and actionability
-- [ ] Develop advanced prompts with deeper scientific context
-- [ ] Implement detection mechanism for user expertise level
-- [ ] Build adaptive system that adjusts detail level based on user responses
-
+#### 8.3 Research Server (`src/mcp/research_server.py`)
 ```python
-# Prompt evolution structure
-def get_dynamic_prompt(user_state):
-    """Generate dynamic prompts based on user state."""
-    # Base prompts
-    base_prompts = {
-        "complete_data": "...",
-        "partial_data": "...",
-        "minimal_data": "..."
+from typing import Dict, Any
+from .base import BaseMCPServer
+
+class ResearchServer(BaseMCPServer):
+    def __init__(self, api_key: str):
+        super().__init__(api_key)
+        self.papers_cache = {}
+        
+    async def _process_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        query = request.get("query", "")
+        
+        if query in self.papers_cache:
+            return self.papers_cache[query]
+            
+        # Simple keyword-based search for MVP
+        # TODO: Replace with vector database in future
+        results = await self._search_papers(query)
+        self.papers_cache[query] = results
+        return results
+```
+
+#### 8.4 Tools Server (`src/mcp/tools_server.py`)
+```python
+from typing import Dict, Any
+from .base import BaseMCPServer
+
+class ToolsServer(BaseMCPServer):
+    async def _process_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        tool_name = request.get("tool")
+        
+        if tool_name == "biological_age":
+            return await self._calculate_biological_age(request.get("data", {}))
+        elif tool_name == "health_score":
+            return await self._calculate_health_score(request.get("data", {}))
+            
+        return {"error": "Unknown tool"}
+        
+    async def _calculate_biological_age(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        # Implement biological age calculation
+        # This is a placeholder for the actual implementation
+        return {"biological_age": 0.0}
+```
+
+#### 8.5 Query Router (`src/mcp/router.py`)
+```python
+from typing import Dict, Any
+import re
+
+class QueryRouter:
+    def __init__(self):
+        self.health_patterns = [
+            r"health data",
+            r"metrics",
+            r"measurements",
+            r"apple health"
+        ]
+        self.research_patterns = [
+            r"research",
+            r"study",
+            r"paper",
+            r"evidence"
+        ]
+        self.tools_patterns = [
+            r"calculate",
+            r"compute",
+            r"estimate",
+            r"biological age"
+        ]
+    
+    def route_query(self, query: str) -> str:
+        query = query.lower()
+        
+        if any(re.search(pattern, query) for pattern in self.health_patterns):
+            return "health"
+        elif any(re.search(pattern, query) for pattern in self.research_patterns):
+            return "research"
+        elif any(re.search(pattern, query) for pattern in self.tools_patterns):
+            return "tools"
+            
+        return "unknown"
+```
+
+### 9. Streamlit Integration Update ✅
+
+#### 9.1 MCP Client Setup (`app.py` updates)
+```python
+from mcp import MultiServerMCPClient
+from src.mcp.health_server import HealthServer
+from src.mcp.research_server import ResearchServer
+from src.mcp.tools_server import ToolsServer
+from src.mcp.router import QueryRouter
+
+# Initialize MCP servers
+async def init_mcp_servers():
+    api_key = os.getenv("MCP_API_KEY")
+    health_data_path = "data/test_health_data/export.csv"
+    
+    servers = {
+        "health": HealthServer(api_key, health_data_path),
+        "research": ResearchServer(api_key),
+        "tools": ToolsServer(api_key)
     }
     
-    # Persona-specific adaptations
-    persona_modifiers = {
-        "beginner": "...",
-        "intermediate": "...",
-        "advanced": "..."
-    }
+    client = MultiServerMCPClient()
+    for name, server in servers.items():
+        await client.add_server(name, server)
     
-    # Select appropriate prompt based on user state
-    # Add persona-specific modifications
-    # Return customized prompt
+    return client
+
+# Initialize session state for MCP
+if "mcp_client" not in st.session_state:
+    st.session_state.mcp_client = asyncio.run(init_mcp_servers())
+    st.session_state.query_router = QueryRouter()
 ```
 
-### 8.3 Contextual Follow-Up Prompts
-- [ ] Design prompts that reference previously discussed biomarkers
-- [ ] Create prompts for tracking changes in measurements over time
-- [ ] Develop prompts that adjust recommendations based on user feedback
-- [ ] Build memory system for retaining key user preferences and constraints
-- [ ] Implement proactive follow-up prompts for previously suggested measurements
-
-## 9. Evaluation Framework Enhancement 🔄
-- [ ] Create synthetic user profiles with varied data completeness levels
-- [ ] Develop metrics for measuring completion rate of recommended actions
-- [ ] Implement conversation flow evaluation for different user paths
-- [ ] Design context-retention evaluations across multiple conversation turns
-- [ ] Create multi-modal evaluations for biomarker visualization understanding
-
-### 9.1 Data Assessment Evaluation
-- [ ] Create test cases with different levels of initial data completeness
-- [ ] Develop metrics for evaluating accuracy of data gap identification
-- [ ] Implement evaluation for prioritization of suggested measurements
-- [ ] Design test cases for handling conflicting or inconsistent data
-- [ ] Develop metrics for measuring helpfulness of data collection guidance
-
+#### 9.2 Query Processing Update
 ```python
-# Example test cases for data assessment
-def create_data_assessment_test_cases():
-    test_cases = []
+async def process_user_query(query: str) -> str:
+    # Route query to appropriate server
+    server_type = st.session_state.query_router.route_query(query)
     
-    # Test Case 1: Very limited initial data (20% complete)
-    test_cases.append(LLMTestCase(
-        input="Hi, I'm new here. Can you help me understand my biological age?",
-        actual_output="",  # To be filled during evaluation
-        retrieval_context=[
-            "User has 20% data completeness",
-            "User has Blood Glucose = 95 mg/dL, HbA1c = 5.4%, and Steps = 8,000/day",
-            "User is missing critical measurements like inflammation markers, functional assessments, and body composition"
-        ],
-        task="Accurately summarize existing data and suggest highest-priority missing measurements"
-    ))
+    if server_type == "unknown":
+        return "I'm not sure how to process this query. Could you be more specific?"
     
-    # Test Case 2: Partial initial data (50% complete)
-    test_cases.append(LLMTestCase(
-        input="What does my health data tell you about my biological age?",
-        actual_output="",  # To be filled during evaluation
-        retrieval_context=[
-            "User has 50% data completeness",
-            "User has complete biomarker panel but missing functional assessments",
-            "Biomarkers show elevated inflammation (hs-CRP = 2.8 mg/L) and borderline glucose metabolism"
-        ],
-        task="Balance analysis of existing data with targeted suggestions for missing functional assessments"
-    ))
-    
-    # Test Case 3: Nearly complete data (80% complete)
-    test_cases.append(LLMTestCase(
-        input="I'd like a complete analysis of my biological age based on my data.",
-        actual_output="",  # To be filled during evaluation
-        retrieval_context=[
-            "User has 80% data completeness across all categories",
-            "User is only missing advanced lab tests like telomere length and DNA methylation",
-            "Existing data shows mixed signals: excellent functional capacity but suboptimal metabolic biomarkers"
-        ],
-        task="Provide comprehensive analysis while explaining value of missing advanced tests"
-    ))
-    
-    return test_cases
-
-# Evaluation metrics for data assessment
-class DataGapIdentificationMetric(BaseMetric):
-    """Metric for evaluating how accurately the coach identifies important data gaps."""
-    def __init__(self, threshold=0.8):
-        super().__init__(threshold)
-        
-    def measure(self, test_case):
-        # Evaluate if coach correctly identified the most important missing data
-        # Compare coach's suggestions against known high-value gaps
-        # Return score between 0 and 1
-        pass
+    try:
+        response = await st.session_state.mcp_client.send_request(
+            server_type,
+            {
+                "query": query,
+                "api_key": os.getenv("MCP_API_KEY")
+            }
+        )
+        return format_response(response)
+    except Exception as e:
+        return f"Error processing query: {str(e)}"
 ```
 
-### 9.2 Conversation Flow Evaluation
-- [ ] Create multi-turn conversation test cases
-- [ ] Develop metrics for measuring conversation coherence
-- [ ] Design tests for appropriate follow-up questioning
-- [ ] Implement evaluation for handling tangential user questions
-- [ ] Build metrics to assess balance between guidance and adaptability
+### 10. Security Implementation 🔄
+- [ ] Set up API key management
+- [ ] Implement request authentication
+- [ ] Add input validation and sanitization
 
-### 9.3 Recommendation Quality Evaluation
-- [ ] Create test cases for evaluating personalization of recommendations
-- [ ] Develop metrics for scientific accuracy of interpretations
-- [ ] Design evaluation for actionability of suggested protocols
-- [ ] Implement tests for appropriateness of recommendations given data limitations
-- [ ] Build metrics to assess clarity and specificity of explanations
+### 11. Testing Updates 🔄
+- [x] Create basic MCP server test suite
+- [x] Implement initial integration tests
+- [ ] Add comprehensive test cases for routing
+- [ ] Add performance benchmarks
+- [ ] Create context-aware evaluation framework
+- [ ] Implement MCP-specific test scenarios
 
-```python
-# Enhanced evaluation framework
-def create_evaluation_matrix():
-    # Define axes of evaluation
-    dimensions = [
-        "data_completeness",  # How well coach handles varying data completeness
-        "recommendation_specificity",  # How specific recommendations are to user data
-        "follow_up_quality",  # How well coach follows up on previous conversations
-        "explanation_quality",  # How well coach explains complex concepts
-        "visualization_interpretation"  # How well coach interprets charts and graphs
-    ]
-    
-    # Create test cases for each dimension at different levels
-    test_cases = []
-    for dimension in dimensions:
-        for level in ["basic", "intermediate", "advanced"]:
-            test_cases.extend(create_test_cases(dimension, level))
-    
-    return test_cases
+### 12. Health Data Management 🆕
+- [ ] Standardize test data format
+- [ ] Create health data validation schema
+- [ ] Implement data versioning
+- [ ] Add data migration tools
+- [ ] Create data cleanup utilities
+
+### 13. Evaluation Framework Updates 🆕
+- [ ] Create MCP-specific test cases
+- [ ] Add routing context validation
+- [ ] Implement prompt verification
+- [ ] Add server response validation
+- [ ] Create comprehensive test scenarios
+- [ ] Add performance metrics for routing
+
+### Next Steps
+
+#### Immediate Actions (Current Sprint)
+1. **Health Data Standardization (1 week)**
+   - Define standard test data format
+   - Create validation schema
+   - Implement data cleanup tools
+   - Add versioning support
+
+2. **Evaluation Framework Enhancement (1 week)**
+   - Create MCP-aware test cases
+   - Add routing context validation
+   - Implement prompt testing
+   - Add server response validation
+
+3. **Testing & Documentation (1 week)**
+   - Update test suite
+   - Add new test scenarios
+   - Document data formats
+   - Create testing guides
+
+## Part 3: Future Enhancements 🔄
+
+### 14. Database Integration for User Health Data
+- [ ] Implement database connection and queries
+- [ ] Create data mapper for health records
+- [ ] Build initialization flow
+- [ ] Add data completeness assessment
+- [ ] Develop intelligent prompting
+
+### 15. Prompt Engineering Evolution
+- [ ] Analyze conversation logs
+- [ ] Create specialized templates
+- [ ] Implement A/B testing
+- [ ] Design persona-based prompts
+- [ ] Add context-aware prompting
+
+### 16. Advanced Analytics
+- [ ] Implement trend analysis
+- [ ] Create personalized targets
+- [ ] Build recommendation engine
+- [ ] Design progress tracking
+- [ ] Add adaptive coaching
+
+## Dependencies Update (`requirements.txt`)
 ```
-
-## 10. Advanced Analytics and Personalization 🔄
-- [ ] Implement trend analysis for biomarkers over time
-- [ ] Create personalized improvement targets based on user data
-- [ ] Build recommendation prioritization algorithm
-- [ ] Design progress visualization and milestone tracking
-- [ ] Implement adaptive coaching based on user adherence patterns
+streamlit>=1.24.0
+pandas>=2.0.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+python-dotenv>=1.0.0
+mcp>=1.0.0  # Add actual version
+aiohttp>=3.8.0
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+```
 
 ## Next Steps
 
 ### Immediate Actions (Phase 1)
-1. **Database Integration (1-2 weeks)**
-   - Create database connector module for user health data
-   - Map database schema to our six-category data model
-   - Develop and test data loading during chat initialization
-   - Implement caching for efficient data access
+1. **MCP Server Setup (1 week)**
+   - Create base MCP server class
+   - Implement health data server
+   - Add research paper server
+   - Build tools server
+   - Set up query router
 
-2. **Initial Assessment Prompts (1 week)**
-   - Develop and test DATA_ASSESSMENT_PROMPT template
-   - Create CRITICAL_DATA_PROMPT for users with minimal data
-   - Implement existing data summarization logic 
-   - Build high-value measurement suggestion algorithm
+2. **Integration (1 week)**
+   - Update Streamlit app
+   - Add MCP client setup
+   - Implement query processing
+   - Test end-to-end flow
 
-3. **Data Assessment Evaluation (1 week)**
-   - Create test suite with 5-10 synthetic user profiles
-   - Implement DataGapIdentificationMetric
-   - Develop test harness for automated evaluation
-   - Establish baseline performance metrics
+3. **Testing & Security (1 week)**
+   - Set up test suite
+   - Add authentication
+   - Implement validation
+   - Run performance tests
 
 ### Mid-Term Goals (Phase 2)
-1. Implement tiered prompting system based on user expertise level
-2. Develop conversation flow enhancements for follow-up discussions
-3. Expand evaluation framework with more sophisticated test cases
-4. Implement dashboard for monitoring coach performance
+1. Move MCP servers to separate processes
+2. Add proper research database
+3. Enhance query routing with LLM
+4. Implement advanced metrics
 
 ### Long-Term Vision (Phase 3)
-1. Develop full analytics dashboard for user progress visualization
-2. Implement adaptive coaching system
-3. Create community features for shared goals and achievements
-4. Integrate with broader health ecosystem 
+1. Deploy as microservices
+2. Add vector database
+3. Enable real-time sync
+4. Build analytics dashboard 
