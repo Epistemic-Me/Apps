@@ -1,0 +1,15 @@
+{
+  "@context": "https://a2a.org/agent-card/v1",
+  "id": "http://0.0.0.0:8000/.well-known/agent.json",
+  "name": null,
+  "description": "Agent creates a digital twin of the user based on the user profile and a related Epistemic Me self-model.",
+  "publisher": null,
+  "skills": [],
+  "endpoints": {
+    "tasks": "http://0.0.0.0:8000/tasks"
+  },
+  "metadata": {
+    "bedrock_agent_id": "UCWS8QJDRU",
+    "version": null
+  }
+}

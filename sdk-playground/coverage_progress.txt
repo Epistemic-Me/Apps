@@ -1,0 +1,54 @@
+
+Test Coverage Progress Report
+Generated: 2025-04-01 00:28:24
+
+Category Progress
+----------------
+UI        14.33% /  70.00% (Gap:  55.67%)
+Service   16.67% /  90.00% (Gap:  73.33%)
+Data      34.62% /  90.00% (Gap:  55.38%)
+
+File Progress
+-------------
+src/api/endpoints.py
+  Current:   0.00%
+  Target:   90.00%
+  Gap:      90.00%
+  Priority: High
+
+src/ui/app.py
+  Current:   0.00%
+  Target:   70.00%
+  Gap:      70.00%
+  Priority: High
+
+src/services/evaluation.py
+  Current:  33.33%
+  Target:   90.00%
+  Gap:      56.67%
+  Priority: High
+
+src/data/dataset_generator.py
+  Current:  34.62%
+  Target:   90.00%
+  Gap:      55.38%
+  Priority: Medium
+
+src/ui/components/metrics_display.py
+  Current:  16.28%
+  Target:   70.00%
+  Gap:      53.72%
+  Priority: High
+
+src/ui/components/main_layout.py
+  Current:  16.95%
+  Target:   70.00%
+  Gap:      53.05%
+  Priority: High
+
+src/ui/components/conversation_turn.py
+  Current:  24.07%
+  Target:   70.00%
+  Gap:      45.93%
+  Priority: High
+

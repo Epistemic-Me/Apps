@@ -3,10 +3,13 @@ import plotly.graph_objects as go
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 
-from .components.conversation_turn import (
+from src.ui.components.conversation_turn import (
     render_conversation_sidebar,
     TurnMetricsSummary
 )
+
+# Page config must be the first Streamlit command
+st.set_page_config(layout="wide", page_title="Dashboard")
 
 class Dashboard:
     def __init__(self):
@@ -128,3 +131,65 @@ class Dashboard:
     def handle_turn_selection(self, turn_id: str):
         """Handle turn selection in the sidebar"""
         st.session_state.current_turn_id = turn_id 
+
+# --- Add main block for standalone Streamlit run ---
+if __name__ == "__main__":
+    from src.data.dataset_generator import DatasetGenerator
+    from src.models.conversation import Conversation
+
+    # Initialize session state if needed
+    if 'datasets' not in st.session_state:
+        generator = DatasetGenerator()
+        datasets = generator.generate_multiple_datasets([
+            {"name": "Sample Dataset", "num_conversations": 1}
+        ])
+        st.session_state.datasets = datasets
+        st.session_state.current_dataset_index = 0
+        st.session_state.current_conversation_index = 0
+
+    # Get current dataset and conversation
+    current_dataset = st.session_state.datasets[st.session_state.current_dataset_index]
+    conversation = None
+    if hasattr(current_dataset, 'test_cases') and current_dataset.test_cases:
+        # Convert test case to Conversation model if needed
+        from src.models.conversation import Turn, ConversationMetrics
+        from src.models.context import EvaluationContext
+        test_case = current_dataset.test_cases[0]
+        # Minimal conversion for demo
+        turns = []
+        for i in range(2):
+            turns.append(Turn(
+                id=f"turn_{i}",
+                coach_message=f"Coach message {i}",
+                user_message=f"User message {i}",
+                belief_updates={"old": {}, "new": {}},
+                timestamp=0.0
+            ))
+        context = EvaluationContext(
+            user_cohort="demo_cohort",
+            router_intent="Demo Intent",
+            belief_system={},
+            demographic_data={},
+            session_history=[],
+            learning_objectives=["Demo objective"],
+            confidence_scores={}
+        )
+        metrics = ConversationMetrics(
+            user_identification=0.8,
+            belief_evidencing=0.7,
+            belief_verification=0.9,
+            ambiguity=0.6,
+            learning_progress=0.8,
+            answer_prediction=0.7,
+            question_clarity=0.8
+        )
+        conversation = Conversation(
+            id="conv_0",
+            turns=turns,
+            context=context,
+            metrics=metrics
+        )
+
+    available_datasets = [d.name for d in st.session_state.datasets]
+    dashboard = Dashboard()
+    dashboard.render(conversation, available_datasets) 

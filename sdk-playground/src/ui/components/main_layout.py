@@ -41,8 +41,8 @@ class MainLayout:
             # Create Turn object from test case
             turns.append(Turn(
                 id=f"turn_{i}",
-                user_message=turn.input,  # User's message
-                coach_message=turn.actual_output,  # Coach's response
+                coach_message=turn.input,  # Coach's message (prompt/question)
+                user_message=turn.actual_output,  # User's response
                 belief_updates={
                     "old": {},  # Would need to extract from context if available
                     "new": {}

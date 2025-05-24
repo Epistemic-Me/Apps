@@ -47,7 +47,6 @@ def create_llm_test_case(input_text: str, output_text: str, context: list = None
         comments=None,
         tools_called=None,
         expected_tools=None,
-        reasoning=None,
         name=None
     )
     return test_case
